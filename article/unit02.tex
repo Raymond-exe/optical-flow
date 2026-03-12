@@ -1,0 +1,479 @@
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+% IS&T Template 
+% Patrick Vandewalle
+% January 2006
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Document class
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[letterpaper,twocolumn,fleqn]{article} 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Packages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{ist}
+\usepackage[margin=1in]{geometry}
+% add other packages here
+\usepackage{float} %forza
+\usepackage{wrapfig} %forza
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage[american]{circuitikz}
+\pagestyle{empty}                % no page numbers is default
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  showstringspaces=false,
+  xleftmargin=0.02\columnwidth,
+  xrightmargin=0.02\columnwidth
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Title and Authors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{Unit 2: Polynomial Interpolation Applied to\\
+  Diode I--V Characteristic Reconstruction }
+\author{ Jacky Li; Cal Poly Pomona; Pomona, California \\ February 23, 2025}
+ % date has an empty field.
+% correct for bad hyphenation here
+% \hyphenation{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Begin document
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document} 
+\maketitle 
+\thispagestyle{empty} % prevents the first page to be numbered
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Abstract
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{abstract}
+In many engineering scenarios, we have a limited set of measured data points and
+need to reconstruct the underlying continuous function.  Polynomial
+interpolation provides a systematic way to achieve this.  In this report, we
+apply two interpolation methods---\textbf{Lagrange interpolation} and
+\textbf{Newton's divided-difference interpolation}---to reconstruct the I--V
+characteristic of a silicon diode from simulated lab measurements.  We show that
+both methods produce the \emph{same} interpolating polynomial but differ in
+computational structure: Lagrange uses basis polynomials while Newton uses a
+divided-difference table.  We compare their results against the known Shockley
+model and analyze the interpolation error.
+\end{abstract}
+
+
+\section{Introduction}
+
+Polynomial interpolation is the process of constructing a polynomial of degree
+at most $n-1$ that passes exactly through $n$ given data points
+$(x_0, y_0), (x_1, y_1), \ldots, (x_{n-1}, y_{n-1})$.  Two classical forms of
+the interpolating polynomial are:
+
+\begin{itemize}
+  \item \textbf{Lagrange form} --- expresses the polynomial as a weighted sum of
+        basis polynomials $L_i(x)$, each designed to be~1 at~$x_i$ and~0 at all
+        other data points.
+  \item \textbf{Newton's divided-difference form} --- builds the polynomial
+        incrementally using a divided-difference table, making it easy to add
+        new data points without recomputing everything.
+\end{itemize}
+
+Both forms yield the \emph{same unique polynomial} (by the uniqueness theorem),
+but their computational approaches and practical trade-offs differ.
+
+In this report, we apply both methods to a practical EE problem: reconstructing
+the I--V characteristic curve of a silicon diode from a small number of measured
+data points.
+
+% ════════════════════════════════════════════════════════════════════
+\section{Background}
+
+\subsection{Lagrange Interpolation}
+Given $n$ data points, the Lagrange interpolating polynomial is
+\begin{equation}
+  P(x) = \sum_{i=0}^{n-1} y_i \, L_i(x), \quad
+  L_i(x) = \prod_{\substack{j=0 \\ j \neq i}}^{n-1}
+            \frac{x - x_j}{x_i - x_j}
+  \label{eq:lagrange}
+\end{equation}
+Each $L_i(x)$ is a polynomial of degree $n-1$ satisfying $L_i(x_j) = \delta_{ij}$.
+
+\subsection{Newton's Divided-Difference Interpolation}
+The Newton form is
+\begin{equation}
+  P(x) = c_0 + c_1(x - x_0) + c_2(x - x_0)(x - x_1) + \cdots
+  \label{eq:newton}
+\end{equation}
+where the coefficients $c_k$ are the \emph{divided differences}:
+\begin{align}
+  f[x_i] &= y_i \\
+  f[x_i, x_{i+1}] &= \frac{f[x_{i+1}] - f[x_i]}{x_{i+1} - x_i} \\
+  f[x_i, \ldots, x_{i+k}] &= \frac{f[x_{i+1}, \ldots, x_{i+k}]
+                                   - f[x_i, \ldots, x_{i+k-1}]}
+                                   {x_{i+k} - x_i}
+\end{align}
+and $c_k = f[x_0, x_1, \ldots, x_k]$.
+
+
+% ════════════════════════════════════════════════════════════════════
+\section{Problem Formulation}
+
+\subsection{Motivation}
+A diode's I--V relationship follows the Shockley equation:
+\begin{equation}
+  I_d = I_s \left( e^{\,V_d / (n\,V_T)} - 1 \right)
+  \label{eq:shockley}
+\end{equation}
+In practice, we often only have \emph{measured} data from the lab rather than
+the exact model parameters.  Interpolation allows us to reconstruct the full
+curve from a few measurements.
+
+\subsection{Data}
+We use five simulated ``measured'' data points from a silicon diode with
+parameters $I_s = 10^{-12}\;\text{A}$, $n = 1.5$, and $V_T = 25.85\;\text{mV}$,
+with $\pm2\%$ measurement noise added:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ccc@{}}
+\toprule
+\textbf{Point} & $V_d$ [V] & $I_d$ [mA] \\
+\midrule
+1 & 0.30 & $2.31 \times 10^{-6}$ \\
+2 & 0.50 & $3.97 \times 10^{-4}$ \\
+3 & 0.65 & $0.0193$ \\
+4 & 0.75 & $0.2590$ \\
+5 & 0.85 & $3.2982$ \\
+\bottomrule
+\end{tabular}
+\caption{Measured diode data points (with $\pm2\%$ noise).}
+\label{tab:data}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════
+% ════════════════════════════════════════════════════════════════════
+\section{Implementation}
+
+\subsection{Lagrange Interpolation}
+\begin{lstlisting}[caption={Lagrange interpolation (tools.py)},label={lst:lagrange}]
+def lagrange_interpolate(self, x, y):
+    n = len(x)
+    P = np.zeros(n)
+    for i in range(n):
+        Li = np.array([1.0])
+        denom = 1.0
+        for j in range(n):
+            if i != j:
+                Li = np.convolve(Li, np.array([1.0, -x[j]]))
+                denom *= (x[i] - x[j])
+        P = P + Li * (y[i] / denom)
+    return P, 0
+\end{lstlisting}
+
+\subsection{Newton's Divided-Difference Interpolation}
+\begin{lstlisting}[caption={Newton's divided-difference interpolation (tools.py)},label={lst:newton}]
+def newton_interpolate(self, x, y):
+    n = len(x)
+    dd = np.copy(y).astype(float)
+    coefs = [dd[0]]
+    for j in range(1, n):
+        for i in range(n - 1, j - 1, -1):
+            dd[i] = (dd[i] - dd[i-1]) / (x[i] - x[i-j])
+        coefs.append(dd[j])
+    # Convert to standard polynomial
+    P = np.array([coefs[0]])
+    basis = np.array([1.0])
+    for k in range(1, n):
+        basis = np.convolve(basis, np.array([1.0, -x[k-1]]))
+        P = np.polyadd(P, coefs[k] * basis)
+    return P, 0
+\end{lstlisting}
+
+% ════════════════════════════════════════════════════════════════════
+\section{Results}
+
+\subsection{Polynomial Coefficients}
+Both methods produce the \textbf{same} 4th-degree polynomial (up to floating-point
+precision), confirming the uniqueness theorem of polynomial interpolation.
+
+\subsection{I--V Curve Reconstruction}
+Figure~\ref{fig:iv} (left) shows the interpolated curves overlaid with the true
+Shockley model.  Both Lagrange (blue dashed) and Newton (red dotted) traces are
+indistinguishable, and they closely follow the true model within the data range
+$[0.3, 0.85]$~V.
+
+Figure~\ref{fig:iv} (right) shows the absolute interpolation error on a
+logarithmic scale.  The error is smallest near the data points and grows toward
+the edges of the interpolation interval.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{unit02_interpolation_results.png}
+  \caption{Left: Interpolated diode I--V curves vs.\ true Shockley model.
+           Right: Absolute error of interpolation vs.\ true model.}
+  \label{fig:iv}
+\end{figure}
+
+\subsection{Data Trend Comparison}
+Figure~\ref{fig:trend} compares the true diode current, Lagrange prediction,
+and Newton prediction at several test voltages \emph{not} present in the
+original data set.  The close agreement confirms accurate interpolation within
+the data range.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{unit02_data_trend.png}
+  \caption{Data trend: True vs.\ Lagrange vs.\ Newton at test voltages.}
+  \label{fig:trend}
+\end{figure}
+
+% ════════════════════════════════════════════════════════════════════
+\section{Discussion}
+
+\subsection{Lagrange vs.\ Newton: Comparison}
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Property} & \textbf{Lagrange} & \textbf{Newton} \\
+\midrule
+Produces unique polynomial & Yes & Yes \\
+Easy to add new data points & No (recompute all) & Yes (extend table) \\
+Computational form & Basis polynomials & Divided differences \\
+Numerical stability & May suffer for large $n$ & Generally better \\
+Good for understanding & Yes (explicit formula) & Yes (recursive) \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of interpolation methods.}
+\label{tab:comparison}
+\end{table}
+
+\subsection{Practical Considerations}
+\begin{itemize}
+  \item Both methods produce the same result for the same data, but Newton's
+        form is more efficient when data points are added incrementally (e.g.,
+        during a lab experiment).
+  \item With only $n=5$ data points, the 4th-degree polynomial provides a
+        reasonable approximation within the data range but should \emph{not}
+        be used for extrapolation.
+  \item For the exponential nature of the diode curve, higher-order
+        interpolation or specialized fitting (e.g., nonlinear least squares)
+        may be preferred for high-accuracy applications.
+\end{itemize}
+
+% ════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+
+We applied Lagrange and Newton's divided-difference interpolation to
+reconstruct a silicon diode's I--V characteristic from five measured data
+points.  Both methods produced the identical 4th-degree polynomial, verifying
+the uniqueness theorem.  The interpolated curve closely matched the true
+Shockley model within the data range.  Newton's form offers practical
+advantages when incrementally adding data, while Lagrange's form provides a
+more intuitive closed-form expression.
+
+\end{document}
+
+
+
+\clearpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Overall Document Guidelines: Head
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Overall Document Guidelines: Head}
+\label{sec:intro}
+
+Clear document of any fonts other than Times, Arial, and Symbol. The
+paper should be formatted using the tags provided in the template,
+i.e., title, author, section, subsection, subsubsection, eq./fig.,
+references, etc.  in a 2 column format on US letter size paper ($8.5
+\times 11$ inches, or $21.6 \times 27.9$ cm).
+
+The left and right margins are set automatically to .75 inch (1.90 cm),
+and the top and bottom margins to 1.0 inch (2.54 cm). The document is in
+a 2-column format with column widths set at 3.38 inch (8.57 cm) and the
+gutter -the space between columns- at .25 inch (0.635 cm).
+
+Papers should be a maximum of 4-6 pages; longer papers will be
+returned for revision. Please do not place folios or page numbers in
+your paper. That information is inserted when we assemble the book.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Graphics and Equations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Graphics and Equations}
+Graphics and equations should fit within one column (3.38 inches
+wide), but full width (7 inch) figures are also acceptable. Equations,
+figures and figure captions each have their own style tags. Equations
+are numbered using parentheses flushed right as shown below.
+
+\begin{equation}
+\label{eq:ist}
+\textrm{IS\&T} + \textrm{members} \times \textrm{Confs.} = \textrm{Success}
+\end{equation}
+
+
+\subsection{Helpful Hints and Style Tags: Subhead}
+For a complete listing of the style tags for use in this template
+refer to Table \ref{tab:fonts}. These are the style tags for
+conference proceedings; if you use the wrong template/style tags your
+paper will be sent back to you to be reformatted.  All of these forms
+and templates related to the publication of conference papers are
+available at
+
+www.imaging.org/conferences/guidelines.cfm. 
+
+Select the specific conference and download the Authors Kit. The
+template may vary from one conference to another.
+
+The template is set up for MS Word and LaTeX. Please check the paper
+carefully to confirm that the styles have been applied correctly, then
+print it out and double check to ensure that the paper appears as
+intended.
+
+\begin{table}[!h]
+\caption{Style Tag Table: Table head}
+\label{tab:fonts}
+\begin{center}       
+\begin{tabular}{|p{0.45\columnwidth}|p{0.45\columnwidth}|} 
+\hline
+1. Title& title environment \\ \hline
+2. Byline: & \\
+Author/Affiliation & author environment \\ \hline
+3. Head & section environment \\ \hline
+4. Subhead & subsection environment \\ \hline
+5. Tertiary head & subsubsection environment \\ \hline
+6. Abstract & abstract environment \\ \hline 
+& \\ \hline
+7. Body & regular text\\ \hline
+8. Equation & equation environment\\ \hline
+9.1 Figure & align left \\ \hline
+9.2 Figure caption & caption environment \\ \hline
+10.1 Table head & caption environment \\ \hline
+10.2 Table text & tabular environment \\ \hline
+11. References & bibliography + 
+command \emph{small} to have a 1pt smaller font\\ \hline
+12. Author Bio text & biography environment\\ \hline
+13.1 List, bullet & itemize environment\\ \hline
+13.2 List, numbered & enumerate environment \\ \hline
+\end{tabular}
+\end{center}
+\end{table} 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Submitting Your Paper
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Submitting Your Paper}
+The submission of your paper has to be performed through the IS\&T
+submission website. Authors receive a login for this site by e-mail.
+Papers can be submitted in Postscript, Word, or WordPerfect format,
+and will be converted to PDF by the submission server. Please
+carefully review the generated PDF and verify that all the text,
+equations, figures and tables are displayed correctly before approving
+its submission.
+
+\subsection{Margins in LaTeX}
+Because of the differences between dvips conversion utilities, the
+margins of your generated PDF document might vary. Please print
+your document, and verify its margins. If they are incorrect, please
+adapt the sizes of the margins in the file \emph{ist.sty}. Typically the
+top margin should be decreased.
+
+\begin{table}[!h]
+\caption{Document Specs: Table head}
+\label{tab:specs}
+\begin{center}       
+\begin{tabular}{p{0.35\columnwidth}p{0.55\columnwidth}} 
+Paper Size & US Letter \\
+Left/right margin & .75 inch (1.90 cm) \\
+Top/bottom margin & 1 inch (2.54 cm) \\
+Columns & 2 at 3.38 inch (8.57 cm) wide. \\
+ & Spacing between columns: 0.25 inch (0.635 cm)
+\end{tabular}
+\end{center}
+\end{table} 
+
+\begin{figure}[!hb]
+  \includegraphics[width=0.3\columnwidth]{logo.png}
+  \caption{IS\&T logo.}
+  \label{Figure:logo}
+\end{figure}
+
+Please contact IS\&T with any questions or requests for assistance in
+helping prepare the paper. We look forward to having your paper
+presented at the conference and published in the conference
+proceedings.
+
+\begin{figure}[!hb]
+  \includegraphics[width=0.3\columnwidth]{logo.png}
+  \caption{IS\&T logo.}
+  \label{Figure:logo}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Reference Preparation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Reference Preparation}
+Use the standard LaTeX \emph{cite} command for references in the
+text. You can then use the standard bibliography command to generate
+the list of references. Add the command \emph{small} before the
+bibliography to give it the right font size.  Reference \cite{bib1}
+style should be used for books, Reference \cite{bib2} style should be
+used for Journals, and Reference \cite{bib3} style should be used for
+Proceedings.
+
+%\section{Acknowledgments} 
+%add the acknowledgement section here
+
+% To start a new column (but not a new page) and help balance the last-page
+% column length use \vfill\pagebreak.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bibliography
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\small
+\begin{thebibliography}{9}
+\bibitem{bib1}John Doe, Recent Progress in Digital Halftoning II,
+  IS\&T, Springfield, VA, 1999, pg. 173.
+\bibitem{bib2}John Doe, Digital Imaging, J. Imaging. Sci. and
+  Technol., 42, 112 (1998).
+\bibitem{bib3}John Doe, An Inexpensive Micro-Goniophotometry You Can
+  Build, Proc. PICS, pg. 179. (1998).
+\end{thebibliography}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Biography
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{biography}
+Please submit a brief biographical sketch of no more than 75 words. 
+Include relevant professional and educational information as shown 
+in the example below.
+
+Jane Doe received her BS in physics from the University of Nevada (1977) 
+and her PhD in applied physics from Columbia University (1983). Since 
+then she has worked in the Research and Technology Division at Xerox 
+in Webster, NY. Her work has focused on the development of toner adhesion 
+and transport issues. She is on the Board of  IS\&T and a member of APS 
+and SPIE.
+\end{biography}
+
+\end{document} 

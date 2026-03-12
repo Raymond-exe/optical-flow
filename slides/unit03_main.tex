@@ -1,0 +1,421 @@
+\documentclass[a4paper,landscape,12pt]{extarticle}
+\usepackage[left=0.5in,right=0.5in,top=0.4in,bottom=0.55in]{geometry}
+
+\usepackage{graphicx}
+\usepackage[normalem]{ulem}
+\usepackage{multicol}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+% ---------- Listings (code blocks) ----------
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\Large,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  numbers=left,
+  numberstyle=\Large\color{gray},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\author{Jacky Li}
+
+% Page style with slide numbers
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[R]{\Large\thepage\ / \pageref{LastPage}}
+
+% Header (expects cpp_logo.png in same folder)
+\newcommand{\slideheader}[2]{%
+\noindent
+\includegraphics[height=0.5in]{cpp_logo.png}%
+\hspace{0.3in}%
+{\Large \uline{#1 \hfill #2}}%
+\par\vspace{0.4in}
+}
+
+\begin{document}
+\begin{huge}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 1 - Title Slide
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{ECE 5110 Numerical Modeling}{Jacky Li}
+
+\vspace{1.0in}
+\begin{center}
+{\Huge \textbf{Numerical Differentiation \& Integration Seminar}}
+
+\vspace{0.35in}
+{\LARGE Unit 3: Numerical Differentiation and Integration}\\
+\vspace{0.15in}
+{\LARGE \textbf{Optical Flow — Movement Tracking in 2D Space}}
+
+\vspace{0.35in}
+{\Large March 11, 2025}
+\end{center}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 2 - Outline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Outline}{Differentiation \& Integration}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.2in}
+
+\begin{itemize}
+  \item Introduction: Why Differentiation \& Integration?
+  \item Theory: 4 Single Integral Forms + 2 Double Integral Forms
+  \item Numerical Differentiation (Finite Differences)
+  \item Problem: Optical Flow on a Figure-8 Path
+  \item Matrix Calculation: Lucas-Kanade Method
+  \item Results: Convergence Comparison (n = 10:10:1000)
+  \item Discussion and Conclusion
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 3 - Why Differentiation & Integration?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Why Numerical Differentiation \& Integration?}{Introduction}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+\begin{multicols}{2}
+\textbf{Differentiation}
+\begin{itemize}
+  \item Estimate derivatives from discrete data
+  \item Forward, backward, central differences
+  \item Applications: velocity from position, gradients in images
+\end{itemize}
+
+\columnbreak
+
+\textbf{Integration}
+\begin{itemize}
+  \item Approximate definite integrals
+  \item Multiple quadrature rules with different accuracy
+  \item Applications: displacement from velocity, energy, area
+\end{itemize}
+\end{multicols}
+
+\vspace{0.25in}
+\textbf{Goal:} Implement 4 single + 2 double integral methods, apply them to \textbf{optical flow} (2D movement tracking).
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 4 - Four Single Integral Rules
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Four Single Integral Quadrature Rules}{Theory}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\textbf{1. Trapezoidal Rule} \quad $O(h^2)$
+\[
+\int_a^b f\,dx \approx \frac{h}{2}\bigl[f_0 + 2\textstyle\sum f_i + f_n\bigr]
+\]
+
+\textbf{2. Simpson's 1/3 Rule} \quad $O(h^4)$, $n$ even
+\[
+\int_a^b f\,dx \approx \frac{h}{3}\bigl[f_0 + 4\textstyle\sum_{\text{odd}} f_i + 2\textstyle\sum_{\text{even}} f_i + f_n\bigr]
+\]
+
+\textbf{3. Simpson's 3/8 Rule} \quad $O(h^4)$, $n \bmod 3 = 0$
+\[
+\int_a^b f\,dx \approx \frac{3h}{8}\bigl[f_0 + 3\textstyle\sum_{i\not\equiv 0} f_i + 2\textstyle\sum_{i\equiv 0} f_i + f_n\bigr]
+\]
+
+\textbf{4. Midpoint Rule} \quad $O(h^2)$
+\[
+\int_a^b f\,dx \approx h \sum_{i=0}^{n-1} f\!\left(\frac{x_i + x_{i+1}}{2}\right)
+\]
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 5 - Double Integral + Differentiation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Double Integrals \& Numerical Differentiation}{Theory}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\begin{multicols}{2}
+\textbf{Double Integration} (tensor product)
+\[
+\iint_R f(x,y)\,dx\,dy \approx \sum_i \sum_j w_{ij}\, f(x_i, y_j)
+\]
+
+Two forms:
+\begin{itemize}
+  \item Trapezoidal 2D --- $O(h^2)$
+  \item Simpson 2D --- $O(h^4)$
+\end{itemize}
+
+\columnbreak
+
+\textbf{Finite Differences}
+
+Central: $\displaystyle f'(x_i) \approx \frac{f_{i+1} - f_{i-1}}{2h}$
+
+\vspace{0.15in}
+Forward: $\displaystyle f'(x_i) \approx \frac{f_{i+1} - f_i}{h}$
+
+\vspace{0.15in}
+Backward: $\displaystyle f'(x_i) \approx \frac{f_i - f_{i-1}}{h}$
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 6 - Optical Flow Problem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Problem: Optical Flow on a Figure-8 Path}{Optical Flow}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{multicols}{2}
+% LEFT
+\textbf{Simulated cursor trajectory:}
+\begin{align*}
+x(t) &= \sin(t) \\
+y(t) &= \tfrac{1}{2}\sin(2t) \\
+v_x(t) &= \cos(t) \\
+v_y(t) &= \cos(2t)
+\end{align*}
+
+$t \in [0, 2\pi]$, $N = 200$ samples.
+
+\columnbreak
+
+% RIGHT
+\textbf{Pipeline:}
+\begin{enumerate}
+  \item \textbf{Differentiate} position $\to$ velocity
+  \item \textbf{Integrate} velocity $\to$ reconstruct position
+  \item \textbf{Matrix solve} (Lucas-Kanade) $\to$ estimate flow from gradients
+\end{enumerate}
+
+\vspace{0.15in}
+All three use our implemented numerical methods.
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 7 - Lucas-Kanade Matrix Calculation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Matrix Calculation: Lucas-Kanade Optical Flow}{Optical Flow}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\textbf{Optical flow constraint:} \quad $I_x u + I_y v + I_t = 0$
+
+\vspace{0.15in}
+Over $N$ pixels in a window:
+\[
+\underbrace{\begin{bmatrix} I_{x_1} & I_{y_1} \\ I_{x_2} & I_{y_2} \\ \vdots & \vdots \\ I_{x_N} & I_{y_N} \end{bmatrix}}_{\mathbf{A}_{N \times 2}}
+\begin{bmatrix} u \\ v \end{bmatrix}
+= \underbrace{-\begin{bmatrix} I_{t_1} \\ I_{t_2} \\ \vdots \\ I_{t_N} \end{bmatrix}}_{\mathbf{b}_{N \times 1}}
+\]
+
+\vspace{0.15in}
+\textbf{Least-squares solution:}
+\[
+\boxed{\begin{bmatrix} u \\ v \end{bmatrix} = \left(\mathbf{A}^T \mathbf{A}\right)^{-1} \mathbf{A}^T \mathbf{b}}
+\]
+
+$\mathbf{A}^T\mathbf{A}$ is a $2 \times 2$ matrix --- eigenvalues indicate flow reliability.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 8 - Implementation: Integration Methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Trapezoidal \& Simpson 1/3}{Jacky Li}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+def integrate_trapezoidal(self, f, a, b, n):
+    h = (b - a) / n
+    x = np.linspace(a, b, n + 1)
+    y = np.array([f(xi) for xi in x])
+    return h * (y[0]/2 + np.sum(y[1:-1]) + y[-1]/2)
+
+def integrate_simpson13(self, f, a, b, n):
+    if n % 2 != 0: n += 1
+    h = (b - a) / n
+    x = np.linspace(a, b, n + 1)
+    y = np.array([f(xi) for xi in x])
+    return (h/3)*(y[0] + 4*np.sum(y[1::2])
+           + 2*np.sum(y[2:-1:2]) + y[-1])
+\end{lstlisting}
+
+\vspace{0.1in}
+\textbf{Note:} No plots or prints --- only in \texttt{unit03.py}.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 9 - Implementation: Differentiation + Matrix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Differentiation \& Lucas-Kanade}{Jacky Li}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+# Central difference
+def differentiate(self, y, h, method='central'):
+    dy = np.zeros(len(y))
+    for i in range(1, len(y) - 1):
+        dy[i] = (y[i+1] - y[i-1]) / (2*h)
+    dy[0] = (y[1]-y[0])/h; dy[-1] = (y[-1]-y[-2])/h
+    return dy
+
+# Lucas-Kanade (in unit03.py)
+A = np.column_stack([Ix, Iy])    # Nx2
+ATA = A.T @ A                    # 2x2
+ATb = A.T @ (-It)                # 2x1
+flow = np.linalg.inv(ATA) @ ATb  # [u, v]
+\end{lstlisting}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 10 - Results: Quadrature Convergence
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Results: Single Integral Error (n = 10:10:1000)}{Results}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{center}
+\includegraphics[width=0.75\textwidth]{unit03_single_integral_comparison.png}
+\end{center}
+
+\vspace{0.1in}
+\begin{itemize}
+  \item Simpson 1/3 and 3/8: \textbf{$O(h^4)$} convergence --- steep slope
+  \item Trapezoidal and Midpoint: \textbf{$O(h^2)$} convergence --- shallower slope
+  \item Simpson's methods reach machine precision faster
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 11 - Results: Optical Flow
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Results: Optical Flow — Trajectory \& Velocity}{Results}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{center}
+\includegraphics[width=0.92\textwidth]{unit03_optical_flow.png}
+\end{center}
+
+\vspace{0.1in}
+\begin{itemize}
+  \item \textbf{Left:} True vs.\ reconstructed figure-8 path (close agreement)
+  \item \textbf{Center:} Velocity from differentiation matches analytical truth
+  \item \textbf{Right:} Reconstruction error remains bounded
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 12 - Comparison Table
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Method Comparison}{Integration}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Order} & \textbf{Constraint} & \textbf{Best For} \\
+\midrule
+Trapezoidal     & $O(h^2)$ & None          & Simple, reliable \\
+Simpson's 1/3   & $O(h^4)$ & $n$ even      & High accuracy \\
+Simpson's 3/8   & $O(h^4)$ & $n \bmod 3=0$ & Odd panel counts \\
+Midpoint        & $O(h^2)$ & None          & Open intervals \\
+\midrule
+Trap.\ 2D       & $O(h^2)$ & None          & 2D simple \\
+Simpson 2D      & $O(h^4)$ & $n_x,n_y$ even & 2D high accuracy \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.15in}
+Simpson's rules achieve \textbf{two extra orders} of accuracy at similar cost.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 13 - Discussion + Conclusion
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Discussion and Conclusion}{Jacky Li}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{multicols}{2}
+\textbf{Key Findings}
+\begin{itemize}
+  \item Simpson's rules ($O(h^4)$) dramatically outperform Trapezoidal/Midpoint ($O(h^2)$) as $n$ increases
+  \item Central differences give $O(h^2)$ derivative estimates --- sufficient for smooth data
+  \item Differentiate-then-integrate pipeline introduces small cumulative drift
+\end{itemize}
+
+\columnbreak
+
+\textbf{Conclusion}
+\begin{itemize}
+  \item Implemented 4 single + 2 double integral methods
+  \item Applied to 2D optical flow (figure-8 trajectory)
+  \item Lucas-Kanade matrix calc accurately recovers velocity via $(\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T\mathbf{b}$
+  \item Complete motion-tracking pipeline: differentiate $\to$ flow solve $\to$ integrate
+\end{itemize}
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+
+\end{huge}
+\end{document}

@@ -1,0 +1,301 @@
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+% IS&T Template 
+% Patrick Vandewalle
+% January 2006
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Document class
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[letterpaper,twocolumn,fleqn]{article} 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Packages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{ist}
+\usepackage[margin=1in]{geometry}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\pagestyle{empty}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  showstringspaces=false,
+  xleftmargin=0.02\columnwidth,
+  xrightmargin=0.02\columnwidth
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Title and Authors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{Unit 3: Numerical Differentiation \& Integration Applied to\\
+  Optical Flow and Movement Tracking in 2D Space}
+\author{ Jacky Li; Cal Poly Pomona; Pomona, California \\ March 11, 2025}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Begin document
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document} 
+\maketitle 
+\thispagestyle{empty}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Abstract
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{abstract}
+Numerical differentiation and integration are foundational tools in
+computational engineering.  In this report, we implement four forms of
+single-variable quadrature (Trapezoidal, Simpson's~1/3, Simpson's~3/8,
+Midpoint) and two forms of double integration (Trapezoidal~2D, Simpson~2D).
+We apply these methods to an \textbf{optical flow} problem---tracking 2D
+cursor movement along a figure-8 trajectory.  Velocity is estimated via
+numerical differentiation of position data, and position is reconstructed by
+integrating the estimated velocity.  A Lucas-Kanade-style matrix calculation
+$(\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T\mathbf{b}$ demonstrates the
+linear algebra behind real optical flow solvers.  Simpson's rules achieve
+fourth-order convergence, dramatically outperforming the second-order
+Trapezoidal and Midpoint rules as the number of steps increases from 10
+to~1000.
+\end{abstract}
+
+
+\section{Introduction}
+
+Numerical differentiation approximates a derivative from discrete data, while
+numerical integration (quadrature) approximates definite integrals.  Both are
+essential in signal processing, control systems, and computer vision.
+
+\textbf{Optical flow} is the apparent motion of brightness patterns in an
+image sequence.  The Lucas-Kanade algorithm estimates flow by combining:
+\begin{enumerate}
+  \item \textbf{Numerical differentiation} --- spatial and temporal intensity
+        gradients $I_x$, $I_y$, $I_t$.
+  \item \textbf{Matrix calculation} --- solving $(\mathbf{A}^T\mathbf{A})\,
+        \mathbf{d} = \mathbf{A}^T\mathbf{b}$ for the velocity vector.
+  \item \textbf{Numerical integration} --- accumulating velocity to obtain
+        displacement (trajectory).
+\end{enumerate}
+
+In this report we implement four single-integral and two double-integral
+quadrature methods, compare their convergence, and demonstrate all three
+components on a 2D tracking problem.
+
+
+\section{Background}
+
+\subsection{Four Single-Integral Quadrature Rules}
+
+\subsubsection{Trapezoidal Rule}
+\begin{equation}
+  \int_a^b f(x)\,dx \approx \frac{h}{2}\bigl[f(x_0) + 2\textstyle\sum_{i=1}^{n-1} f(x_i) + f(x_n)\bigr]
+  \label{eq:trap}
+\end{equation}
+Error: $O(h^2)$.
+
+\subsubsection{Simpson's 1/3 Rule}
+\begin{equation}
+  \int_a^b f\,dx \approx \frac{h}{3}\bigl[f_0 + 4\textstyle\sum_{\text{odd}} f_i + 2\textstyle\sum_{\text{even}} f_i + f_n\bigr]
+  \label{eq:s13}
+\end{equation}
+Error: $O(h^4)$.  Requires $n$ even.
+
+\subsubsection{Simpson's 3/8 Rule}
+\begin{equation}
+  \int_a^b f\,dx \approx \frac{3h}{8}\bigl[f_0 + 3\textstyle\sum_{i\not\equiv 0} f_i + 2\textstyle\sum_{i\equiv 0} f_i + f_n\bigr]
+  \label{eq:s38}
+\end{equation}
+Error: $O(h^4)$.  Requires $n$ divisible by~3.
+
+\subsubsection{Midpoint Rule}
+\begin{equation}
+  \int_a^b f\,dx \approx h \sum_{i=0}^{n-1} f\!\left(\frac{x_i + x_{i+1}}{2}\right)
+  \label{eq:mid}
+\end{equation}
+Error: $O(h^2)$.
+
+\subsection{Double Integration}
+Extend the 1D rules to two dimensions by applying them in each direction
+(tensor-product quadrature):
+\begin{equation}
+  \iint_R f(x,y)\,dx\,dy \approx \sum_i \sum_j w_{ij}\, f(x_i, y_j)
+  \label{eq:double}
+\end{equation}
+
+\subsection{Numerical Differentiation}
+Central finite difference:
+\begin{equation}
+  f'(x_i) \approx \frac{f(x_{i+1}) - f(x_{i-1})}{2h}
+  \label{eq:central}
+\end{equation}
+Error: $O(h^2)$.
+
+\subsection{Lucas-Kanade Optical Flow}
+The optical flow constraint for a pixel is
+\begin{equation}
+  I_x u + I_y v + I_t = 0
+  \label{eq:ofc}
+\end{equation}
+Over a window of $N$ pixels this yields the overdetermined system
+$\mathbf{A}\,\mathbf{d} = \mathbf{b}$, where
+$\mathbf{A} = [I_x\ I_y]$, $\mathbf{d} = [u\ v]^T$, $\mathbf{b} = -I_t$.
+The least-squares solution is
+\begin{equation}
+  \mathbf{d} = (\mathbf{A}^T \mathbf{A})^{-1}\, \mathbf{A}^T \mathbf{b}
+  \label{eq:lk}
+\end{equation}
+
+
+\section{Problem: Optical Flow on a Figure-8 Path}
+
+We simulate a cursor tracing a figure-8:
+\begin{align}
+  x(t) &= \sin(t), \quad y(t) = \tfrac{1}{2}\sin(2t) \\
+  v_x(t) &= \cos(t), \quad v_y(t) = \cos(2t)
+\end{align}
+over $t \in [0, 2\pi]$ with $N = 200$ samples.
+
+The workflow is:
+\begin{enumerate}
+  \item \textbf{Differentiate} position to estimate velocity.
+  \item \textbf{Integrate} velocity to reconstruct position.
+  \item \textbf{Solve} the Lucas-Kanade matrix equation for a
+        synthetic pixel window.
+\end{enumerate}
+
+
+\section{Implementation}
+
+\subsection{Single Integral (Trapezoidal)}
+\begin{lstlisting}
+def integrate_trapezoidal(self, f, a, b, n):
+    h = (b - a) / n
+    x = np.linspace(a, b, n + 1)
+    y = np.array([f(xi) for xi in x])
+    return h * (y[0]/2 + np.sum(y[1:-1]) + y[-1]/2)
+\end{lstlisting}
+
+\subsection{Numerical Differentiation}
+\begin{lstlisting}
+def differentiate(self, y, h, method='central'):
+    n = len(y); dy = np.zeros(n)
+    for i in range(1, n - 1):
+        dy[i] = (y[i+1] - y[i-1]) / (2*h)
+    dy[0]  = (y[1] - y[0]) / h
+    dy[-1] = (y[-1] - y[-2]) / h
+    return dy
+\end{lstlisting}
+
+\subsection{Lucas-Kanade Matrix Solution}
+\begin{lstlisting}
+A = np.column_stack([Ix, Iy])  # Nx2
+b = -It                        # Nx1
+ATA = A.T @ A                  # 2x2
+ATb = A.T @ b                  # 2x1
+flow = np.linalg.inv(ATA) @ ATb
+\end{lstlisting}
+
+
+\section{Results}
+
+\subsection{Single Integral Convergence}
+Figure~\ref{fig:conv} shows the absolute error of all four methods as the
+number of steps increases from 10 to 1000.  The Simpson rules (1/3 and 3/8)
+converge as $O(n^{-4})$, while Trapezoidal and Midpoint converge as
+$O(n^{-2})$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.48\textwidth]{unit03_single_integral_comparison.png}
+  \caption{Error vs.\ number of steps for 4 quadrature methods (log-log).}
+  \label{fig:conv}
+\end{figure}
+
+\subsection{Optical Flow: Differentiation and Integration}
+Figure~\ref{fig:flow} shows: (a)~the true and reconstructed figure-8 path,
+(b)~true vs.\ numerically estimated velocity, and (c)~position reconstruction
+error.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.48\textwidth]{unit03_optical_flow.png}
+  \caption{Optical flow results: trajectory, velocity, and error.}
+  \label{fig:flow}
+\end{figure}
+
+\subsection{Lucas-Kanade Matrix Calculation}
+For a $5 \times 5$ synthetic pixel window with true velocity
+$(u, v) = (1.5, -0.8)$:
+\[
+  \mathbf{A}^T\mathbf{A} =
+  \begin{bmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \end{bmatrix},
+  \quad
+  \mathbf{d} = (\mathbf{A}^T\mathbf{A})^{-1}\,\mathbf{A}^T\mathbf{b}
+\]
+The estimated flow closely matches the true velocity, confirming the
+least-squares formulation.
+
+
+\section{Discussion}
+
+\subsection{Quadrature Comparison}
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Method} & \textbf{Order} & \textbf{Constraint} \\
+\midrule
+Trapezoidal & $O(h^2)$ & None \\
+Simpson's 1/3 & $O(h^4)$ & $n$ even \\
+Simpson's 3/8 & $O(h^4)$ & $n \bmod 3 = 0$ \\
+Midpoint & $O(h^2)$ & None \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of single-integral methods.}
+\label{tab:methods}
+\end{table}
+
+Simpson's rules achieve two extra orders of accuracy at
+essentially the same computational cost.  The trade-off is a constraint on~$n$.
+
+\subsection{Optical Flow Pipeline}
+The differentiate-then-integrate pipeline introduces small cumulative errors
+(drift), typical in inertial navigation and visual odometry.  Higher-order
+differentiation and integration methods reduce this drift.
+
+
+\section{Conclusion}
+
+We implemented four single-integral and two double-integral quadrature methods,
+plus numerical differentiation, and applied them to a 2D optical flow problem.
+Simpson's rules converge as $O(h^4)$ vs.\ $O(h^2)$ for Trapezoidal/Midpoint.
+The Lucas-Kanade matrix calculation accurately recovers the velocity vector.
+Numerical differentiation and integration together form a complete
+motion-tracking pipeline applicable to cursor tracking, robotics, and
+computer vision.
+
+\small
+\begin{thebibliography}{9}
+\bibitem{bib1}R. Burden, J. Faires, \emph{Numerical Analysis}, 10th ed.,
+  Cengage, 2016.
+\bibitem{bib2}B. Lucas, T. Kanade, ``An iterative image registration
+  technique with an application to stereo vision,'' \emph{Proc.\ IJCAI},
+  pp.\ 674--679, 1981.
+\bibitem{bib3}B. Horn, B. Schunck, ``Determining optical flow,''
+  \emph{Artificial Intelligence}, 17, 185--203, 1981.
+\end{thebibliography}
+
+\end{document}

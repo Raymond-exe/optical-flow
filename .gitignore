@@ -1,0 +1,25 @@
+# Ignore Unit 1 & Unit 2 files
+unit01.py
+unit01_newton.py
+unit02.py
+bisection.py
+newton_diode_results.png
+newton_vs_bisection.png
+unit02_interpolation_results.png
+unit02_data_trend.png
+
+# Ignore virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Slides template files (Unit 1/2)
+slides/main.tex
+
+# Article template files (Unit 1)
+article/main.tex

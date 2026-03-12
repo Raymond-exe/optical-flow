@@ -1,0 +1,390 @@
+\documentclass[a4paper,landscape,12pt]{extarticle}
+\usepackage[left=0.5in,right=0.5in,top=0.4in,bottom=0.55in]{geometry}
+
+\usepackage{graphicx}
+\usepackage[normalem]{ulem}
+\usepackage{multicol}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+% ---------- Listings (code blocks) ----------
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\Large,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  numbers=left,
+  numberstyle=\Large\color{gray},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\author{Jacky Li}
+
+% Page style with slide numbers
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[R]{\Large\thepage\ / \pageref{LastPage}}
+
+% Header (expects cpp_logo.png in same folder)
+\newcommand{\slideheader}[2]{%
+\noindent
+\includegraphics[height=0.5in]{cpp_logo.png}%
+\hspace{0.3in}%
+{\Large \uline{#1 \hfill #2}}%
+\par\vspace{0.4in}
+}
+
+\begin{document}
+\begin{huge}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 1 - Title Slide
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{ECE 5110 Numerical Modeling}{Jacky Li}
+
+\vspace{1.0in}
+\begin{center}
+{\Huge \textbf{Polynomial Interpolation Seminar}}
+
+\vspace{0.35in}
+{\LARGE Unit 2: Interpolation and Polynomial Approximation}\\
+\vspace{0.15in}
+{\LARGE \textbf{Diode I--V Characteristic Reconstruction}}
+
+\vspace{0.35in}
+{\Large February 23, 2025}
+\end{center}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 2 - Outline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Outline}{Interpolation}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.2in}
+
+\begin{itemize}
+  \item Introduction: Why Interpolation?
+  \item Theory: Lagrange and Newton's Divided Differences
+  \item Problem: Diode I--V Curve from Measured Data
+  \item Implementation in Python
+  \item Results and Error Analysis
+  \item Lagrange vs.\ Newton Comparison
+  \item Conclusion
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 3 - Why Interpolation?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Why Interpolation?}{Interpolation}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+\begin{multicols}{2}
+\textbf{The Problem}
+\begin{itemize}
+  \item In the lab we measure \textbf{discrete data points}
+  \item We need to reconstruct the \textbf{continuous curve} between them
+  \item Polynomial interpolation: find $P(x)$ of degree $\leq n{-}1$
+        passing through all $n$ points
+\end{itemize}
+
+\columnbreak
+
+\textbf{Two Classical Methods}
+\begin{itemize}
+  \item \textbf{Lagrange:} basis-polynomial form
+  \item \textbf{Newton:} divided-difference form
+  \item Both produce the \textbf{same unique polynomial} (uniqueness theorem)
+\end{itemize}
+\end{multicols}
+
+\vspace{0.25in}
+\textbf{Goal:} Apply both methods to reconstruct a diode I--V curve from measured data and compare.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 4 - Theory: Lagrange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Lagrange Interpolation}{Theory}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\textbf{Formula:}
+\[
+P(x) = \sum_{i=0}^{n-1} y_i \, L_i(x), \qquad
+L_i(x) = \prod_{\substack{j=0 \\ j \neq i}}^{n-1}
+          \frac{x - x_j}{x_i - x_j}
+\]
+
+\vspace{0.15in}
+\textbf{Properties:}
+\begin{itemize}
+  \item Each basis polynomial $L_i(x_j) = \delta_{ij}$ (equals 1 at $x_i$, 0 at all other points)
+  \item Explicit closed-form expression
+  \item Must recompute \textit{everything} if a new data point is added
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 5 - Theory: Newton
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Newton's Divided-Difference Interpolation}{Theory}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\textbf{Formula:}
+\[
+P(x) = c_0 + c_1(x-x_0) + c_2(x-x_0)(x-x_1) + \cdots
+\]
+
+\textbf{Divided differences:}
+\[
+f[x_i, x_{i+1}] = \frac{f[x_{i+1}] - f[x_i]}{x_{i+1} - x_i},
+\qquad c_k = f[x_0, x_1, \ldots, x_k]
+\]
+
+\vspace{0.15in}
+\textbf{Properties:}
+\begin{itemize}
+  \item Built incrementally using a divided-difference table
+  \item Easy to add new data points (just extend the table)
+  \item Generally better numerical stability for large $n$
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 6 - Problem: Diode I-V Curve
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Problem: Diode I--V Curve from Lab Data}{Interpolation}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{multicols}{2}
+
+% LEFT
+\textbf{Scenario:} Reconstruct a silicon diode's I--V curve from 5 lab
+measurements.
+
+\vspace{0.15in}
+\textbf{True model} (Shockley):
+\[
+I_d = I_s \left( e^{\,V_d/(nV_T)} - 1 \right)
+\]
+
+We only have \textbf{discrete measured points} with $\pm 2\%$ measurement noise.
+
+\columnbreak
+
+% RIGHT
+\begin{center}
+\begin{tabular}{cc}
+\toprule
+$V_d$ [V] & $I_d$ [mA] \\
+\midrule
+0.30 & $2.31 \times 10^{-6}$ \\
+0.50 & $3.97 \times 10^{-4}$ \\
+0.65 & 0.0193 \\
+0.75 & 0.2590 \\
+0.85 & 3.2982 \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.15in}
+{\normalsize Measured diode data ($\pm 2\%$ noise)}
+\end{center}
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 7 - Implementation: Lagrange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Lagrange Interpolation}{Jacky Li}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+def lagrange_interpolate(self, x, y):
+    n = len(x)
+    P = np.zeros(n)
+    for i in range(n):
+        Li = np.array([1.0])
+        denom = 1.0
+        for j in range(n):
+            if i != j:
+                Li = np.convolve(Li, np.array([1.0, -x[j]]))
+                denom *= (x[i] - x[j])
+        P = P + Li * (y[i] / denom)
+    return P, 0
+\end{lstlisting}
+
+\vspace{0.15in}
+\textbf{Note:} No plots or prints in the method --- plotting is done in \texttt{unit02.py}.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 8 - Implementation: Newton
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Newton's Divided Differences}{Jacky Li}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+def newton_interpolate(self, x, y):
+    n = len(x)
+    dd = np.copy(y).astype(float)
+    coefs = [dd[0]]
+    for j in range(1, n):
+        for i in range(n-1, j-1, -1):
+            dd[i] = (dd[i]-dd[i-1]) / (x[i]-x[i-j])
+        coefs.append(dd[j])
+    P = np.array([coefs[0]])
+    basis = np.array([1.0])
+    for k in range(1, n):
+        basis = np.convolve(basis, np.array([1.0, -x[k-1]]))
+        P = np.polyadd(P, coefs[k] * basis)
+    return P, 0
+\end{lstlisting}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 9 - Results: I-V Reconstruction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Results: I--V Curve Reconstruction and Error}{Interpolation}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{center}
+\includegraphics[width=0.92\textwidth]{unit02_interpolation_results.png}
+\end{center}
+
+\vspace{0.1in}
+\begin{itemize}
+  \item \textbf{Left:} Both Lagrange (blue) and Newton (red) traces overlap --- same polynomial
+  \item \textbf{Right:} Absolute error is smallest near data points, grows at edges
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 10 - Results: Data Trend
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Data Trend: True vs Lagrange vs Newton}{Interpolation}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{center}
+\includegraphics[width=0.62\textwidth]{unit02_data_trend.png}
+\end{center}
+
+\vspace{0.15in}
+\begin{itemize}
+  \item Test voltages \textbf{not in} the original measured data
+  \item All three values match closely within the interpolation range
+  \item Both methods give \textbf{identical} results (same polynomial confirmed)
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 11 - Comparison Table
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Lagrange vs Newton: Comparison}{Interpolation}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Property} & \textbf{Lagrange} & \textbf{Newton} \\
+\midrule
+Produces unique polynomial & Yes & Yes \\
+Easy to add new data points & No (recompute all) & Yes (extend table) \\
+Computational form & Basis polynomials & Divided differences \\
+Numerical stability & May suffer for large $n$ & Generally better \\
+Coefficient difference & \multicolumn{2}{c}{$\sim 2.22 \times 10^{-16}$ (machine $\varepsilon$)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.2in}
+\textbf{Key insight:} Both produce the \textit{same} curve, but Newton is more flexible for incremental data.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 12 - Discussion + Conclusion
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Discussion and Conclusion}{Jacky Li}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{multicols}{2}
+\textbf{Practical Considerations}
+\begin{itemize}
+  \item Newton's form is more efficient for incremental data collection (e.g., during a lab experiment)
+  \item With only $n=5$ points, the 4th-degree polynomial is reasonable \textit{within} the data range
+  \item Should \textbf{not} extrapolate beyond data range
+  \item For highly nonlinear curves, more points or specialized fitting may be preferred
+\end{itemize}
+
+\columnbreak
+
+\textbf{Conclusion}
+\begin{itemize}
+  \item Reconstructed diode I--V curve from 5 measured points
+  \item Both methods yield the \textbf{same} 4th-degree polynomial (uniqueness theorem)
+  \item Close agreement with true Shockley model within data range
+  \item Newton's divided-difference form is preferred for incremental data
+  \item Lagrange provides a more intuitive closed-form expression
+\end{itemize}
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+
+\end{huge}
+\end{document}
