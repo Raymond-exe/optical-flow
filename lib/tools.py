@@ -262,3 +262,37 @@ class tools:
             dy[-1] = (y[-1] - y[-2]) / h
 
         return dy
+
+    def optical_flow_lk(self, frame1, frame2, win=7):
+        import numpy as np;
+        import cv2;
+        Ix = cv2.Sobel(frame2, cv2.CV_32F, 1, 0, ksize=5)
+        Iy = cv2.Sobel(frame2, cv2.CV_32F, 0, 1, ksize=5)
+
+        return self.lucas_kanade_matrix(Ix, Iy, (frame2-frame1), win)
+
+    def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
+        import numpy as np;
+        h, w = Ix.shape
+        u = np.zeros((h, w))
+        v = np.zeros((h, w))
+        half = win // 2
+
+        for y in range(half, h - half):
+            for x in range(half, w - half):
+                ix = Ix[y-half:y+half+1, x-half:x+half+1].flatten()
+                iy = Iy[y-half:y+half+1, x-half:x+half+1].flatten()
+                it = It[y-half:y+half+1, x-half:x+half+1].flatten()
+
+                A = np.column_stack([ix, iy])
+                b = -it
+
+                ATA = A.T @ A
+                if np.min(np.linalg.eigvals(ATA)) < 1e-3:
+                    continue
+
+                flow = np.linalg.inv(ATA) @ (A.T @ b)
+                u[y, x] = flow[0]
+                v[y, x] = flow[1]
+
+        return u, v
