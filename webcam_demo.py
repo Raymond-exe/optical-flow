@@ -5,8 +5,8 @@ import numpy as np
 tool = tools()
 
 
-scale = 0.1 # 0.01 -> 1.0, higher resolution = slower compute time
-sensitivity = 4 # 1 = least sensitive, 4 = most sensitive
+scale = 0.05 # 0.01 -> 1.0, higher resolution = slower compute time
+sensitivity = 20000 # 1 = least sensitive, 4 = most sensitive
 frameOverlay = True # set to False for just the optical flow data
 interpolateFlow = False # set to True to smooth pixelated optical flow data
 
@@ -72,7 +72,7 @@ while True:
     hsv = np.zeros((*u.shape, 3), dtype=np.uint8)
     hsv[..., 0] = (angle * 180 / np.pi / 2).astype(np.uint8)
     hsv[..., 1] = 255
-    hsv[..., 2] = np.clip(cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX) * sensitivity, 0, 255).astype(np.uint8)
+    hsv[..., 2] = np.clip(magnitude * sensitivity, 0, 255).astype(np.uint8)
 
     upscaled = cv2.resize(
         cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR),
