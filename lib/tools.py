@@ -266,6 +266,10 @@ class tools:
     def optical_flow_lk(self, frame1, frame2, win=7):
         import numpy as np;
         import cv2;
+
+        frame1 = np.nan_to_num(frame1, nan=0.0, posinf=0.0, neginf=0.0)
+        frame2 = np.nan_to_num(frame2, nan=0.0, posinf=0.0, neginf=0.0)
+
         Ix = cv2.Sobel(frame2, cv2.CV_32F, 1, 0, ksize=5)
         Iy = cv2.Sobel(frame2, cv2.CV_32F, 0, 1, ksize=5)
 
