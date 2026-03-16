@@ -322,7 +322,78 @@ flow = np.linalg.inv(ATA) @ ATb  # [u, v]
 \newpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% SLIDE 10 - Results: Quadrature Convergence
+% SLIDE 10 - Implementation: optical_flow_lk + lucas_kanade_matrix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Optical Flow in tools.py}{}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+def optical_flow_lk(self, frame1, frame2, win=7):
+    Ix = cv2.Sobel(frame2, cv2.CV_32F, 1, 0, ksize=5)
+    Iy = cv2.Sobel(frame2, cv2.CV_32F, 0, 1, ksize=5)
+    return self.lucas_kanade_matrix(Ix, Iy, (frame2-frame1), win)
+
+def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
+    h, w = Ix.shape
+    u, v = np.zeros((h,w)), np.zeros((h,w))
+    half = win // 2
+    for y in range(half, h - half):
+      for x in range(half, w - half):
+        A = np.column_stack([Ix[...].flatten(), Iy[...].flatten()])
+        ATA = A.T @ A
+        if np.min(np.linalg.eigvals(ATA)) < 1e-3:
+            continue  # skip singular windows
+        flow = np.linalg.inv(ATA) @ (A.T @ (-It[...].flatten()))
+        u[y, x], v[y, x] = flow[0], flow[1]
+    return u, v
+\end{lstlisting}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 11 - Webcam Demo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Live Webcam Demo (webcam\_demo.py)}{Demo}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\begin{multicols}{2}
+\textbf{How it works:}
+\begin{enumerate}
+  \item Capture consecutive webcam frames
+  \item Downscale for performance (configurable \texttt{scale})
+  \item Call \texttt{tool.optical\_flow\_lk(prev, curr)}
+  \item Encode flow as HSV:
+    \begin{itemize}
+      \item Hue $=$ direction
+      \item Value $=$ magnitude
+    \end{itemize}
+  \item Overlay on live video with color-wheel legend
+\end{enumerate}
+
+\columnbreak
+
+\textbf{Configurable parameters:}
+\begin{itemize}
+  \item \texttt{scale}: resolution (0.01 -- 1.0)
+  \item \texttt{sensitivity}: color intensity (1 -- 20000+)
+  \item \texttt{frameOverlay}: overlay on video or raw flow
+  \item \texttt{interpolateFlow}: smooth pixelated output
+\end{itemize}
+
+\vspace{0.2in}
+Press \texttt{q} to quit the demo.
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 12 - Results: Quadrature Convergence
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \slideheader{Results: Single Integral Error (n = 10:10:1000)}{Results}
 

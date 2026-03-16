@@ -214,6 +214,51 @@ ATb = A.T @ b                  # 2x1
 flow = np.linalg.inv(ATA) @ ATb
 \end{lstlisting}
 
+\subsection{Optical Flow with Sobel Gradients (tools.py)}
+The \texttt{optical\_flow\_lk} method in \texttt{tools.py} computes real
+optical flow between two grayscale frames.  Sobel operators approximate the
+spatial gradients $I_x$ and $I_y$, and the temporal gradient is simply the
+frame difference.
+
+\begin{lstlisting}
+def optical_flow_lk(self, frame1, frame2, win=7):
+    Ix = cv2.Sobel(frame2, cv2.CV_32F, 1, 0, ksize=5)
+    Iy = cv2.Sobel(frame2, cv2.CV_32F, 0, 1, ksize=5)
+    return self.lucas_kanade_matrix(
+               Ix, Iy, (frame2 - frame1), win)
+\end{lstlisting}
+
+\subsection{Window-Based Lucas-Kanade (tools.py)}
+The \texttt{lucas\_kanade\_matrix} method slides a $w \times w$ window over
+every pixel and solves the $2 \times 2$ normal equations for $(u, v)$.
+Eigenvalue thresholding avoids singular or poorly conditioned windows.
+
+\begin{lstlisting}
+def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
+    h, w = Ix.shape
+    u, v = np.zeros((h,w)), np.zeros((h,w))
+    half = win // 2
+    for y in range(half, h - half):
+      for x in range(half, w - half):
+        ix = Ix[y-half:y+half+1, x-half:x+half+1].flatten()
+        iy = Iy[y-half:y+half+1, x-half:x+half+1].flatten()
+        it = It[y-half:y+half+1, x-half:x+half+1].flatten()
+        A = np.column_stack([ix, iy])
+        ATA = A.T @ A
+        if np.min(np.linalg.eigvals(ATA)) < 1e-3:
+            continue
+        flow = np.linalg.inv(ATA) @ (A.T @ (-it))
+        u[y, x], v[y, x] = flow[0], flow[1]
+    return u, v
+\end{lstlisting}
+
+\subsection{Live Webcam Demo}
+A real-time demonstration (\texttt{webcam\_demo.py}) applies
+\texttt{optical\_flow\_lk} to each pair of consecutive webcam frames.  The
+estimated flow vectors are encoded as HSV (hue~= direction, value~=
+magnitude) and overlaid on the live video feed, with a color-wheel legend for
+interpreting the flow directions.
+
 
 \section{Results}
 
