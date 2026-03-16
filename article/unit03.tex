@@ -243,21 +243,32 @@ def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
         ix = Ix[y-half:y+half+1, x-half:x+half+1].flatten()
         iy = Iy[y-half:y+half+1, x-half:x+half+1].flatten()
         it = It[y-half:y+half+1, x-half:x+half+1].flatten()
-        A = np.column_stack([ix, iy])
-        ATA = A.T @ A
-        if np.min(np.linalg.eigvals(ATA)) < 1e-3:
-            continue
-        flow = np.linalg.inv(ATA) @ (A.T @ (-it))
-        u[y, x], v[y, x] = flow[0], flow[1]
+        if not np.all(np.isfinite(ix)): continue
+        sxx, sxy = np.dot(ix,ix), np.dot(ix,iy)
+        syy = np.dot(iy,iy)
+        det = sxx*syy - sxy*sxy
+        if det < tau*tau: continue  # reject singular
+        bx, by = -np.dot(ix,it), -np.dot(iy,it)
+        u[y,x] = (syy*bx - sxy*by) / det
+        v[y,x] = (sxx*by - sxy*bx) / det
     return u, v
 \end{lstlisting}
 
 \subsection{Live Webcam Demo}
 A real-time demonstration (\texttt{webcam\_demo.py}) applies
-\texttt{optical\_flow\_lk} to each pair of consecutive webcam frames.  The
-estimated flow vectors are encoded as HSV (hue~= direction, value~=
-magnitude) and overlaid on the live video feed, with a color-wheel legend for
-interpreting the flow directions.
+\texttt{optical\_flow\_lk} to each pair of consecutive webcam frames.
+Several noise-reduction techniques are employed:
+\begin{itemize}
+  \item \textbf{Gaussian blur} ($5 \times 5$) before Sobel gradient
+        computation to suppress sensor noise in bright regions.
+  \item \textbf{Magnitude thresholding}: flow vectors below a minimum
+        magnitude are zeroed out, eliminating spurious motion from
+        auto-exposure flickering.
+  \item \textbf{Eigenvalue thresholding}: windows with weak texture
+        (small $\det(\mathbf{A}^T\mathbf{A})$) are skipped.
+\end{itemize}
+The estimated flow is encoded as HSV (hue~= direction, value~= magnitude)
+and overlaid on the live feed with a color-wheel legend.
 
 
 \section{Results}

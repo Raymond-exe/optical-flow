@@ -5,10 +5,10 @@ import numpy as np
 tool = tools()
 
 
-scale = 0.05 # 0.01 -> 1.0, higher resolution = slower compute time
-sensitivity = 20000 # 1 = least sensitive, 4 = most sensitive
+scale = 0.10 # higher = finer tracking but slower (0.05 was too coarse for hands)
+sensitivity = 8000  # lower = less noise, higher = more responsive
 frameOverlay = True # set to False for just the optical flow data
-interpolateFlow = False # set to True to smooth pixelated optical flow data
+interpolateFlow = True # smooth pixelated optical flow for cleaner overlay
 
 
 def create_flow_legend(radius=80):
@@ -68,6 +68,10 @@ while True:
     u, v = tool.optical_flow_lk(prev_gray, gray)
 
     magnitude, angle = cv2.cartToPolar(u.astype(np.float32), v.astype(np.float32))
+
+    # Zero out tiny motions (auto-exposure / sensor noise)
+    mag_threshold = 0.3
+    magnitude[magnitude < mag_threshold] = 0
 
     hsv = np.zeros((*u.shape, 3), dtype=np.uint8)
     hsv[..., 0] = (angle * 180 / np.pi / 2).astype(np.uint8)
