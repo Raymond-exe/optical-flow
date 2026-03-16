@@ -24,16 +24,21 @@ Jake Davila · Jack Gaon · Jacky Li · Virgil Nhieu · Elijah Perez · Josiah W
 ├── article/
 │   └── unit03.tex                # LaTeX article (IS&T two-column format)
 ├── slides/
-│   └── unit03_main.tex           # LaTeX slides (landscape presentation)
-├── templates/                    # LaTeX template references
-└── .github/
-    ├── SKILL/                    # Workflow instructions for contributors
-    │   ├── create-function-in-lib.md
-    │   ├── create-slides.md
-    │   ├── create-article.md
-    │   └── create-unit-test.md
-    └── AGENTS/
-        └── github-instructions.md
+│   ├── unit03_main.tex           # LaTeX slides (landscape presentation)
+│   └── unit03_presentation.tex   # Full presentation script with speaker notes
+├── templates/
+│   └── presentation_template.tex # Reusable multi-speaker script template
+├── .github/
+│   ├── SKILL/                    # Step-by-step workflow instructions
+│   │   ├── create-function-in-lib.md
+│   │   ├── create-slides.md
+│   │   ├── create-article.md
+│   │   ├── create-unit-test.md
+│   │   └── create-presentation-script.md
+│   └── AGENTS/                   # AI agent instructions & workflows
+│       ├── github-instructions.md
+│       └── presentation-workflow.md
+└── LICENSE.md
 ```
 
 ---
@@ -165,12 +170,61 @@ A 5×5 synthetic pixel window recovers the true velocity vector (u, v) = (1.5, �
 
 ## 📄 LaTeX Documents
 
-| File | Format | Usage |
-|------|--------|-------|
-| `article/unit03.tex` | IS&T two-column | Requires `ist.sty` in same directory |
-| `slides/unit03_main.tex` | Landscape slides | Requires `cpp_logo.png` in same directory |
+| File | Description | Required Assets |
+|------|-------------|----------------|
+| `article/unit03.tex` | IS&T two-column article | `ist.sty` |
+| `slides/unit03_main.tex` | Landscape presentation slides | `cpp_logo.png` |
+| `slides/unit03_presentation.tex` | Full script with **speaker notes** for 7 presenters | `cpp_logo.png` + plot `.png` files |
+| `templates/presentation_template.tex` | Reusable template with `<<placeholder>>` markers | `cpp_logo.png` |
 
-Compile on [Overleaf](https://www.overleaf.com) or locally with `pdflatex`.
+### How to Compile
+
+1. **Upload to [Overleaf](https://www.overleaf.com):**
+   - Upload the `.tex` file you want to compile
+   - Upload required assets into the **same folder** (see table above)
+   - For slides/presentation: upload `cpp_logo.png`, `unit03_single_integral_comparison.png`, `unit03_optical_flow.png`
+   - For the article: upload `ist.sty` and the plot `.png` files
+   - Click **Recompile**
+
+2. **Or compile locally:**
+   ```bash
+   cd slides
+   pdflatex unit03_presentation.tex
+   ```
+
+### Speaker Notes Toggle
+
+The presentation script (`unit03_presentation.tex`) supports two compile modes:
+
+- **`\shownotestrue`** (default) — prints word-for-word speech in shaded boxes below each slide (speaker copy)
+- **`\shownotesfalse`** — hides all notes, producing clean slides for the projector
+
+---
+
+## 🤖 SKILL & AGENTS
+
+The `.github/` directory contains reusable instruction files for both **human contributors** and **AI coding agents**.
+
+### SKILL Files (`.github/SKILL/`)
+
+Step-by-step "how-to" guides:
+
+| File | Purpose |
+|------|---------|
+| `create-function-in-lib.md` | Add a new numerical method to `lib/tools.py` |
+| `create-unit-test.md` | Create a `unitNN.py` test file |
+| `create-slides.md` | Create landscape LaTeX slides |
+| `create-article.md` | Create an IS&T two-column article |
+| `create-presentation-script.md` | Create a multi-speaker presentation script with speaker notes |
+
+### AGENTS Files (`.github/AGENTS/`)
+
+Workflow instructions for AI agents:
+
+| File | Purpose |
+|------|---------|
+| `github-instructions.md` | Repo conventions, structure, and per-unit workflow |
+| `presentation-workflow.md` | End-to-end workflow for generating a group presentation from the template |
 
 ---
 
@@ -184,4 +238,4 @@ Compile on [Overleaf](https://www.overleaf.com) or locally with `pdflatex`.
 
 ## 📝 License
 
-This project is for academic use as part of ECE 5110-01 at Cal Poly Pomona.
+This project is for academic use as part of ECE 5110-01 at Cal Poly Pomona. See [LICENSE.md](LICENSE.md) for details.
