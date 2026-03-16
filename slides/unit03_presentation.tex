@@ -1,0 +1,683 @@
+\documentclass[a4paper,landscape,12pt]{extarticle}
+\usepackage[left=0.5in,right=0.5in,top=0.4in,bottom=0.55in]{geometry}
+
+\usepackage{graphicx}
+\usepackage[normalem]{ulem}
+\usepackage{multicol}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+
+% ---------- Listings (code blocks) ----------
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\Large,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  numbers=left,
+  numberstyle=\Large\color{gray},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+% Page style with slide numbers
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[R]{\Large\thepage\ / \pageref*{LastPage}}
+
+% Header (expects cpp_logo.png in same folder)
+\newcommand{\slideheader}[2]{%
+\noindent
+\includegraphics[height=0.5in]{cpp_logo.png}%
+\hspace{0.3in}%
+{\Large \uline{#1 \hfill #2}}%
+\par\vspace{0.4in}
+}
+
+% =========================================================================
+%  SPEAKER NOTES COMMAND
+%  Prints the verbatim speech in a shaded box below each slide's content.
+%  Set \shownotes to false to hide notes for the projected version.
+% =========================================================================
+\newif\ifshownotes
+\shownotestrue        % <-- set to \shownotesfalse before compiling the "projector" PDF
+
+\newcommand{\speakernotes}[2]{%
+  % #1 = Speaker name,  #2 = Verbatim speech text
+  \ifshownotes
+    \vfill
+    \begin{tcolorbox}[
+      colback=gray!8, colframe=gray!50,
+      title={\textbf{Speaker: #1} --- Verbatim Script},
+      fonttitle=\large, fontupper=\normalsize,
+      left=6pt, right=6pt, top=4pt, bottom=4pt
+    ]
+    #2
+    \end{tcolorbox}
+  \fi
+}
+
+\begin{document}
+\begin{huge}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 1 — Title Slide
+% SPEAKER: Josiah Wiggins
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{ECE 5110 Numerical Modeling}{}
+
+\vspace{1.0in}
+\begin{center}
+{\Huge \textbf{Numerical Differentiation \& Integration Seminar}}
+
+\vspace{0.35in}
+{\LARGE Unit 3: Numerical Differentiation and Integration}\\
+\vspace{0.15in}
+{\LARGE \textbf{Optical Flow — Movement Tracking in 2D Space}}
+
+\vspace{0.4in}
+{\Large Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, Richie Wong}
+
+\vspace{0.15in}
+{\Large March 15, 2026}
+\end{center}
+
+\speakernotes{Josiah Wiggins}{%
+Good afternoon, everyone. We are Group --- presenting Unit 3 of ECE 5110. Today's seminar covers \textbf{Numerical Differentiation and Integration}, and we are going to demonstrate how these fundamental techniques tie into a real computer-vision application called \textbf{optical flow} --- which is essentially tracking movement in two-dimensional space.
+
+Our team consists of Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, and Richie Wong. Over the next several slides, each of us will walk you through a piece of the theory, the implementation, and the results. Let us get started with the outline.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 2 — Outline
+% SPEAKER: Josiah Wiggins
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Outline}{Differentiation \& Integration}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.2in}
+
+\begin{itemize}
+  \item Introduction: Why Differentiation \& Integration?
+  \item Theory: 4 Single Integral Forms + 2 Double Integral Forms
+  \item Numerical Differentiation (Finite Differences)
+  \item Problem: Optical Flow on a Figure-8 Path
+  \item Matrix Calculation: Lucas-Kanade Method
+  \item Implementation: Code Walkthrough
+  \item Live Demo: Webcam Optical Flow
+  \item Results: Convergence Comparison (n = 10:10:1000)
+  \item Discussion and Conclusion
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Josiah Wiggins}{%
+Here is the roadmap for today's presentation. We will begin with an introduction explaining \emph{why} numerical differentiation and integration matter in engineering. Then we will cover the theory behind four single-integral quadrature rules and two double-integral extensions, along with finite-difference methods for differentiation.
+
+After the theory, we will define our problem: an optical flow scenario where a cursor traces a figure-8. We will show how the Lucas-Kanade method turns this into a matrix equation. Then we will walk through our Python code, show a live webcam demo, present the numerical results, and wrap up with discussion and conclusions. Jake, over to you for the introduction.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 3 — Why Differentiation & Integration?
+% SPEAKER: Jake Davila
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Why Numerical Differentiation \& Integration?}{Introduction}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+\begin{multicols}{2}
+\textbf{Differentiation}
+\begin{itemize}
+  \item Estimate derivatives from discrete data
+  \item Forward, backward, central differences
+  \item Applications: velocity from position, gradients in images
+\end{itemize}
+
+\columnbreak
+
+\textbf{Integration}
+\begin{itemize}
+  \item Approximate definite integrals numerically
+  \item Multiple quadrature rules with different accuracy
+  \item Applications: displacement from velocity, energy, area
+\end{itemize}
+\end{multicols}
+
+\vspace{0.25in}
+\textbf{Goal:} Implement 4 single + 2 double integral methods, apply them to \textbf{optical flow} (2D movement tracking).
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Jake Davila}{%
+So why do we care about numerical differentiation and integration? In many real-world engineering problems, we do not have a neat closed-form expression --- we have discrete data points. Differentiation lets us estimate how fast something is changing: for example, computing velocity from sampled position data, or computing image gradients for edge detection.
+
+On the integration side, given a rate of change --- like velocity --- we can accumulate it over time to recover the total displacement. Different quadrature rules  offer different levels of accuracy, which is critical when you need high-precision results in control systems or signal processing.
+
+Our goal for this unit is to implement four single-integral methods --- Trapezoidal, Simpson's one-third, Simpson's three-eighths, and Midpoint --- plus two double-integral extensions, and then apply all of them to an optical flow problem in two dimensions. Let me hand it to Jack, who will walk you through the quadrature theory.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 4 — Four Single Integral Quadrature Rules
+% SPEAKER: Jack Gaon
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Four Single Integral Quadrature Rules}{Theory}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\textbf{1.\ Trapezoidal Rule} \quad $O(h^2)$
+\[
+\int_a^b f\,dx \approx \frac{h}{2}\bigl[f_0 + 2\textstyle\sum f_i + f_n\bigr]
+\]
+
+\textbf{2.\ Simpson's 1/3 Rule} \quad $O(h^4)$, $n$ even
+\[
+\int_a^b f\,dx \approx \frac{h}{3}\bigl[f_0 + 4\textstyle\sum_{\text{odd}} f_i + 2\textstyle\sum_{\text{even}} f_i + f_n\bigr]
+\]
+
+\textbf{3.\ Simpson's 3/8 Rule} \quad $O(h^4)$, $n \bmod 3 = 0$
+\[
+\int_a^b f\,dx \approx \frac{3h}{8}\bigl[f_0 + 3\textstyle\sum_{i\not\equiv 0} f_i + 2\textstyle\sum_{i\equiv 0} f_i + f_n\bigr]
+\]
+
+\textbf{4.\ Midpoint Rule} \quad $O(h^2)$
+\[
+\int_a^b f\,dx \approx h \sum_{i=0}^{n-1} f\!\left(\frac{x_i + x_{i+1}}{2}\right)
+\]
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Jack Gaon}{%
+Let me present the four quadrature rules we implemented.
+
+First, the \textbf{Trapezoidal Rule}. This is the simplest approach --- you connect adjacent data points with straight lines and sum up the areas of the resulting trapezoids. Its error is order h-squared, meaning if you double the number of steps, the error drops by roughly a factor of four.
+
+Second, \textbf{Simpson's one-third rule}. Instead of straight lines, this fits a parabola through every pair of adjacent intervals, giving an order h-to-the-fourth error. The catch is that the number of sub-intervals n must be even.
+
+Third, \textbf{Simpson's three-eighths rule}. This one uses cubic interpolation over groups of three sub-intervals, also achieving order h-to-the-fourth accuracy. It requires n to be divisible by three.
+
+Finally, the \textbf{Midpoint Rule}, which evaluates the function at the center of each sub-interval instead of the endpoints. It is order h-squared, same as Trapezoidal, but can sometimes be more accurate in practice for certain function types.
+
+The key takeaway: Simpson's methods gain \emph{two extra orders} of accuracy compared to Trapezoidal and Midpoint, at essentially the same computational cost. Now let me continue with double integrals and differentiation.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 5 — Double Integrals & Numerical Differentiation
+% SPEAKER: Jack Gaon
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Double Integrals \& Numerical Differentiation}{Theory}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\begin{multicols}{2}
+\textbf{Double Integration} (tensor product)
+
+$\displaystyle
+\hspace{-1.15in}\iint_R f(x,y)\,dx\,dy \approx \sum_i \sum_j w_{ij}\, f(x_i, y_j)
+$
+
+Two forms:
+\begin{itemize}
+  \item Trapezoidal 2D --- $O(h^2)$
+  \item Simpson 2D --- $O(h^4)$
+\end{itemize}
+
+\columnbreak
+
+\textbf{Finite Differences}
+
+\[
+\text{Central:} \qquad f'(x_i) \approx \frac{f_{i+1} - f_{i-1}}{2h}
+\]
+
+\[
+\text{Forward:} \qquad f'(x_i) \approx \frac{f_{i+1} - f_i}{h}
+\]
+
+\[
+\text{Backward:} \qquad f'(x_i) \approx \frac{f_i - f_{i-1}}{h}
+\]
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Jack Gaon}{%
+For double integrals, we extend the single-variable rules to two dimensions using a tensor-product approach. We apply the quadrature weights independently in both the x- and y-directions. We implemented two forms: a 2D Trapezoidal rule at order h-squared and a 2D Simpson rule at order h-to-the-fourth.
+
+On the right, you see the three finite difference formulas for numerical differentiation. The \textbf{central difference} uses points on both sides of the target, giving an order h-squared error, which is the most accurate of the three for interior points. At the boundaries, we fall back to \textbf{forward} or \textbf{backward} differences since we only have data on one side.
+
+In our optical flow problem, we use central differences to estimate velocity from position samples, and Sobel operators --- which are essentially finite-difference kernels --- to compute image gradients. Now Jacky will set up the optical flow problem.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 6 — Optical Flow Problem
+% SPEAKER: Jacky Li
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Problem: Optical Flow on a Figure-8 Path}{Optical Flow}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{multicols}{2}
+% LEFT
+\textbf{Simulated cursor trajectory:}
+\begin{align*}
+x(t) &= \sin(t) \\
+y(t) &= \tfrac{1}{2}\sin(2t) \\
+v_x(t) &= \cos(t) \\
+v_y(t) &= \cos(2t)
+\end{align*}
+
+$t \in [0, 2\pi]$, $N = 200$ samples.
+
+\columnbreak
+
+% RIGHT
+\textbf{Pipeline:}
+\begin{enumerate}
+  \item \textbf{Differentiate} position $\to$ velocity
+  \item \textbf{Integrate} velocity $\to$ reconstruct position
+  \item \textbf{Matrix solve} (Lucas-Kanade) $\to$ estimate flow from gradients
+\end{enumerate}
+
+\vspace{0.15in}
+All three use our implemented numerical methods.
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Jacky Li}{%
+Now let us set up the problem we are applying these methods to. We simulate a cursor --- think of it as a mouse pointer or a tracked object --- moving along a \textbf{figure-8} path. The parametric equations are x of t equals sine t, and y of t equals one-half sine 2t. Taking derivatives gives us the true velocity: v-x equals cosine t, and v-y equals cosine 2t.
+
+We sample this trajectory at N equals 200 equally spaced time points over one full period from zero to two pi.
+
+Our analysis pipeline has three stages. First, we \textbf{numerically differentiate} the sampled position data to estimate velocity --- using the central difference formula we just discussed. Second, we \textbf{numerically integrate} the estimated velocity to reconstruct the original position, which lets us evaluate the round-trip accuracy. Third, we set up a \textbf{Lucas-Kanade matrix equation} to demonstrate how real optical flow solvers estimate motion from image gradients. Virgil will now explain the matrix math behind Lucas-Kanade.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 7 — Lucas-Kanade Matrix Calculation
+% SPEAKER: Virgil Nhieu
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Matrix Calculation: Lucas-Kanade Optical Flow}{Optical Flow}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\textbf{Optical flow constraint:} \quad $I_x u + I_y v + I_t = 0$
+
+\vspace{0.15in}
+Over $N$ pixels in a window:
+\[
+\underbrace{\begin{bmatrix} I_{x_1} & I_{y_1} \\ I_{x_2} & I_{y_2} \\ \vdots & \vdots \\ I_{x_N} & I_{y_N} \end{bmatrix}}_{\mathbf{A}_{N \times 2}}
+\begin{bmatrix} u \\ v \end{bmatrix}
+= \underbrace{-\begin{bmatrix} I_{t_1} \\ I_{t_2} \\ \vdots \\ I_{t_N} \end{bmatrix}}_{\mathbf{b}_{N \times 1}}
+\]
+
+\vspace{0.15in}
+\textbf{Least-squares solution:}
+\[
+\boxed{\begin{bmatrix} u \\ v \end{bmatrix} = \left(\mathbf{A}^T \mathbf{A}\right)^{-1} \mathbf{A}^T \mathbf{b}}
+\]
+
+$\mathbf{A}^T\mathbf{A}$ is a $2 \times 2$ matrix --- eigenvalues indicate flow reliability.
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Virgil Nhieu}{%
+The Lucas-Kanade method is grounded in the \textbf{optical flow constraint equation}: I-x times u plus I-y times v plus I-t equals zero. Here, I-x and I-y are the spatial image gradients --- computed using numerical differentiation, specifically Sobel operators in our implementation --- and I-t is the temporal gradient, which is simply the difference between two consecutive frames.
+
+For a single pixel, this is one equation with two unknowns, so it is under-determined. The Lucas-Kanade trick is to assume that every pixel in a small window shares the same velocity. That gives us N equations --- one per pixel in the window --- and only two unknowns: u and v.
+
+We stack these equations into matrix form: A is an N-by-2 matrix of spatial gradients, and b is the negative temporal gradient vector. Since N is much larger than 2, this system is over-determined, and we solve it using the normal equations: the velocity vector equals A-transpose-A inverse times A-transpose b.
+
+The matrix A-transpose-A is just two-by-two, so the inverse is cheap. Its eigenvalues tell us whether the window has enough texture to produce a reliable flow estimate --- if both eigenvalues are large, we have a good corner or textured region. If one or both are small, the window is flat or has only an edge, and we should be cautious. Elijah will now show you the code.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 8 — Implementation: Integration Methods
+% SPEAKER: Elijah Perez
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Trapezoidal \& Simpson 1/3}{}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+def integrate_trapezoidal(self, f, a, b, n):
+    h = (b - a) / n
+    x = np.linspace(a, b, n + 1)
+    y = np.array([f(xi) for xi in x])
+    return h * (y[0]/2 + np.sum(y[1:-1]) + y[-1]/2)
+
+def integrate_simpson13(self, f, a, b, n):
+    if n % 2 != 0: n += 1
+    h = (b - a) / n
+    x = np.linspace(a, b, n + 1)
+    y = np.array([f(xi) for xi in x])
+    return (h/3)*(y[0] + 4*np.sum(y[1::2])
+           + 2*np.sum(y[2:-1:2]) + y[-1])
+\end{lstlisting}
+
+\vspace{0.1in}
+\textbf{Note:} These methods live in \texttt{lib/tools.py} --- no plots or prints.
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Elijah Perez}{%
+Let me walk you through the code. All of our numerical methods live in a file called tools.py, inside a class called \texttt{tools}. This keeps the methods clean --- no print statements, no plotting --- just pure computation.
+
+The \textbf{trapezoidal} function takes a callable f, the interval endpoints a and b, and the number of steps n. We compute the step size h, generate n plus 1 equally spaced x-values, evaluate the function at each one, and then apply the trapezoidal formula: h times the sum of the first and last values divided by two, plus all interior values.
+
+The \textbf{Simpson one-third} function is almost the same setup, but first it bumps n up to the next even number if it is odd --- because Simpson's one-third requires an even number of panels. The weighting pattern alternates: multiply odd-indexed values by 4, even-indexed interior values by 2, then scale by h over 3.
+
+We also implemented Simpson's three-eighths and the midpoint rule in the same style, but we are not showing them here for brevity. The key point is that all four methods share the same interface: pass in a function, bounds, and step count, and get back a number. Now let me show the differentiation and Lucas-Kanade code.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 9 — Implementation: Differentiation & Matrix
+% SPEAKER: Elijah Perez
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Differentiation \& Lucas-Kanade}{}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+# Central difference
+def differentiate(self, y, h, method='central'):
+    dy = np.zeros(len(y))
+    for i in range(1, len(y) - 1):
+        dy[i] = (y[i+1] - y[i-1]) / (2*h)
+    dy[0] = (y[1]-y[0])/h; dy[-1] = (y[-1]-y[-2])/h
+    return dy
+
+# Lucas-Kanade (in unit03.py)
+A = np.column_stack([Ix, Iy])    # Nx2
+ATA = A.T @ A                    # 2x2
+ATb = A.T @ (-It)                # 2x1
+flow = np.linalg.inv(ATA) @ ATb  # [u, v]
+\end{lstlisting}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Elijah Perez}{%
+Here is the differentiation function. It takes an array of sampled function values and the step size h. For interior points --- from index 1 through n minus 2 --- we use the central difference formula: y of i plus 1 minus y of i minus 1, all divided by 2h. At the boundaries, we fall back to a one-sided formula.
+
+Below that is the Lucas-Kanade matrix calculation as it appears in \texttt{unit03.py}. We stack the spatial gradients I-x and I-y into an N-by-2 matrix A. Then we form A-transpose-A --- a 2-by-2 matrix --- and A-transpose-b. Finally we compute the inverse and multiply to get the flow vector u, v. This matches the formula Virgil showed on the previous slide. Richie is now going to show the full optical flow implementation in tools.py.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 10 — Implementation: optical_flow_lk + lucas_kanade_matrix
+% SPEAKER: Richie Wong
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: Optical Flow in tools.py}{}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+def optical_flow_lk(self, frame1, frame2, win=7):
+    f1, f2 = np.float32(frame1), np.float32(frame2)
+    f1 = cv2.GaussianBlur(f1, (5,5), 0)  # denoise
+    f2 = cv2.GaussianBlur(f2, (5,5), 0)
+    Ix = cv2.Sobel(f2, cv2.CV_32F, 1, 0, ksize=5)
+    Iy = cv2.Sobel(f2, cv2.CV_32F, 0, 1, ksize=5)
+    return self.lucas_kanade_matrix(Ix, Iy, f2-f1, win)
+
+def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
+    # For each pixel window, solve 2x2 system directly:
+    sxx, sxy, syy = dot(ix,ix), dot(ix,iy), dot(iy,iy)
+    det = sxx*syy - sxy*sxy
+    if det < tau*tau: continue  # skip singular
+    u = (syy*bx - sxy*by) / det
+    v = (sxx*by - sxy*bx) / det
+\end{lstlisting}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Richie Wong}{%
+This is the production-quality optical flow code in \texttt{tools.py} that powers our live demo.
+
+The \texttt{optical\_flow\_lk} function takes two grayscale frames. First, we cast them to float-32 and apply a 5-by-5 \textbf{Gaussian blur} to suppress sensor noise --- especially the white-noise flicker you get from webcam auto-exposure. Then we compute the spatial gradients I-x and I-y using \textbf{Sobel operators} with a kernel size of 5. The temporal gradient is simply frame-2 minus frame-1. We pass all three gradient images to \texttt{lucas\_kanade\_matrix}.
+
+In \texttt{lucas\_kanade\_matrix}, we slide a 7-by-7 window over every pixel. For each window, we flatten the gradient patches and compute the three dot products that form the 2-by-2 A-transpose-A matrix: s-x-x, s-x-y, and s-y-y. We check the determinant --- if it is below a threshold tau-squared, we skip that pixel because the system is essentially singular. Otherwise, we solve the 2-by-2 system directly using Cramer's rule, which is faster than calling a general matrix inverse. This produces the flow vectors u and v for every pixel. Let me now hand it off to Jacky for the live demo.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 11 — Webcam Demo
+% SPEAKER: Jacky Li
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Live Webcam Demo (webcam\_demo.py)}{Demo}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\begin{multicols}{2}
+\textbf{Pipeline:}
+\begin{enumerate}
+  \item Capture consecutive webcam frames
+  \item Downscale for speed (\texttt{scale = 0.10})
+  \item \textbf{Gaussian blur} to suppress sensor noise
+  \item Call \texttt{tool.optical\_flow\_lk(prev, curr)}
+  \item \textbf{Magnitude threshold} to filter flicker
+  \item Encode flow as HSV, overlay on video
+\end{enumerate}
+
+\columnbreak
+
+\textbf{Noise Reduction:}
+\begin{itemize}
+  \item Gaussian blur ($5 \times 5$) before Sobel
+  \item NaN/Inf guard on each window
+  \item Determinant check (skip singular $\mathbf{A}^T\mathbf{A}$)
+  \item Flow magnitude $< 0.3$ zeroed out
+\end{itemize}
+
+\vspace{0.15in}
+Press \texttt{q} to quit.
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Jacky Li}{%
+Now I am going to run a live demonstration. Let me switch to the terminal and launch \texttt{python webcam\_demo.py}.
+
+\textbf{[DEMO CUE: Open terminal, run ``python webcam\_demo.py''. Show the webcam feed with optical flow overlay.]}
+
+What you are seeing is our Lucas-Kanade implementation running in real time on the webcam feed. The pipeline works as follows: we capture pairs of consecutive frames, downscale them to 10 percent of the original resolution for speed, apply a Gaussian blur, and then call our \texttt{optical\_flow\_lk} function from tools.py.
+
+The output is encoded in HSV color space --- the \textbf{hue} represents the direction of motion and the \textbf{brightness} represents the speed. You can see the color wheel legend in the bottom-right corner. Notice how when I wave my hand, you see a burst of color in the direction of motion. Areas that are not moving stay dark.
+
+We apply several noise-reduction techniques. The Gaussian blur suppresses high-frequency sensor noise. There is a NaN and infinity guard on each window to handle edge cases. The determinant check skips pixels where the texture is too weak to produce a reliable estimate. And any flow magnitude below 0.3 is zeroed out to suppress the subtle flicker caused by the webcam's auto-exposure.
+
+\textbf{[DEMO CUE: Wave hand, move objects, then press q to exit.]}
+
+All right, that wraps up the demo. Let me pass it to Josiah for the results.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 12 — Results: Quadrature Convergence
+% SPEAKER: Josiah Wiggins
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Results: Single Integral Error (n = 10:10:1000)}{Results}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{center}
+\includegraphics[width=0.70\textwidth]{unit03_single_integral_comparison.png}
+\end{center}
+
+\vspace{-0.4in}
+\begin{itemize}
+  \item Simpson 1/3 and 3/8: \textbf{$O(h^4)$} convergence --- steep slope
+  \item Trapezoidal and Midpoint: \textbf{$O(h^2)$} convergence --- shallower slope
+  \item Simpson's methods reach machine precision faster
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Josiah Wiggins}{%
+Here are the convergence results. We tested all four single-integral methods on the function f of t equals 3 sine 2t plus t cosine t, integrated from 0 to pi. The exact answer is negative 2, and we computed the absolute error for step counts from 10 to 1000 in increments of 10.
+
+This is a log-log plot, so straight lines indicate polynomial convergence. You can clearly see \textbf{two distinct groups}. The Simpson one-third and three-eighths rules --- shown in orange and green --- form the upper group with a \textbf{steep slope}, corresponding to order h-to-the-fourth convergence. The Trapezoidal and Midpoint rules --- blue and red --- have a shallower slope, corresponding to order h-squared.
+
+By the time we reach n equals 100, the Simpson methods already have errors near 10 to the minus 12, while Trapezoidal and Midpoint are still around 10 to the minus 5. That is a difference of \textbf{seven orders of magnitude} at the same computational effort. This confirms the theoretical prediction: Simpson's rules gain two extra orders of accuracy at essentially no additional cost.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 13 — Results: Optical Flow
+% SPEAKER: Jake Davila
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Results: Optical Flow — Trajectory \& Velocity}{Results}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{center}
+\includegraphics[width=0.92\textwidth]{unit03_optical_flow.png}
+\end{center}
+
+\vspace{0.1in}
+\begin{itemize}
+  \item \textbf{Left:} True vs.\ reconstructed figure-8 path (close agreement)
+  \item \textbf{Center:} Velocity from differentiation matches analytical truth
+  \item \textbf{Right:} Reconstruction error remains bounded
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Jake Davila}{%
+This figure shows three panels from our optical flow experiment.
+
+On the \textbf{left}, you see the original figure-8 trajectory in blue and the reconstructed trajectory in red dashed. The reconstruction was obtained by first differentiating the position data to get velocity, and then integrating that velocity back. The two curves are nearly indistinguishable, which tells us our differentiate-then-integrate pipeline works well.
+
+In the \textbf{center panel}, we compare the true velocity components --- v-x and v-y --- with the numerically estimated velocity. The estimated values, shown as dashed lines, overlay the true curves almost perfectly. The maximum velocity error is on the order of 10 to the minus 4, confirming that central differences are accurate for smooth data with a sufficiently small step size.
+
+On the \textbf{right}, we plot the absolute position reconstruction error over time. You can see that the error remains bounded and small throughout the trajectory, though there is a slight drift that accumulates. This drift is a well-known issue in inertial navigation and visual odometry --- each integration step adds a tiny error that compounds over time. Higher-order methods would reduce this drift.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 14 — Comparison Table
+% SPEAKER: Virgil Nhieu
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Method Comparison}{Integration}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Order} & \textbf{Constraint} & \textbf{Best For} \\
+\midrule
+Trapezoidal     & $O(h^2)$ & None          & Simple, reliable \\
+Simpson's 1/3   & $O(h^4)$ & $n$ even      & High accuracy \\
+Simpson's 3/8   & $O(h^4)$ & $n \bmod 3=0$ & Odd panel counts \\
+Midpoint        & $O(h^2)$ & None          & Open intervals \\
+\midrule
+Trap.\ 2D       & $O(h^2)$ & None          & 2D simple \\
+Simpson 2D      & $O(h^4)$ & $n_x,n_y$ even & 2D high accuracy \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.15in}
+Simpson's rules achieve \textbf{two extra orders} of accuracy at similar cost.
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Virgil Nhieu}{%
+This table summarizes all six integration methods we implemented. Looking at the single-integral methods: Trapezoidal and Midpoint are both order h-squared with no constraints on n. They are the simplest and most reliable choices, especially when you do not know the number of data points in advance. Simpson's one-third is order h-to-the-fourth but requires an even number of sub-intervals. Simpson's three-eighths is also order h-to-the-fourth with the constraint that n must be divisible by three. In our code, we automatically bump n up to meet these constraints if needed.
+
+For double integrals, the pattern is the same: Trapezoidal 2D at order h-squared for simplicity, and Simpson 2D at order h-to-the-fourth for when you need higher accuracy. The 2D Simpson rule requires both n-x and n-y to be even.
+
+The bottom line: if accuracy matters and you can choose your step count, use Simpson's rules. You pay essentially the same computational cost and gain two extra orders of convergence. Now Richie will wrap us up with the discussion and conclusion.
+}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 15 — Discussion and Conclusion
+% SPEAKER: Richie Wong
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Discussion and Conclusion}{}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{multicols}{2}
+\textbf{Key Findings}
+\begin{itemize}
+  \item Simpson's rules ($O(h^4)$) dramatically outperform Trapezoidal/Midpoint ($O(h^2)$) as $n$ increases
+  \item Central differences give $O(h^2)$ derivative estimates --- sufficient for smooth data
+  \item Differentiate-then-integrate pipeline introduces small cumulative drift
+  \item Live webcam demo confirms real-time feasibility
+\end{itemize}
+
+\columnbreak
+
+\textbf{Conclusion}
+\begin{itemize}
+  \item Implemented 4 single + 2 double integral methods
+  \item Applied to 2D optical flow (figure-8 trajectory)
+  \item Lucas-Kanade matrix calc accurately recovers velocity via $(\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T\mathbf{b}$
+  \item Complete motion-tracking pipeline: differentiate $\to$ flow solve $\to$ integrate
+\end{itemize}
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+
+\speakernotes{Richie Wong}{%
+Let me summarize our key findings and conclusions.
+
+On the findings side: the convergence test clearly showed that Simpson's one-third and three-eighths rules dramatically outperform Trapezoidal and Midpoint as n increases. We saw a seven-order-of-magnitude difference in error at n equals 100. Central differences gave us order h-squared derivative estimates, which was more than sufficient for our smooth trajectory data. The differentiate-then-integrate pipeline works well but does introduce a small cumulative drift --- this is expected and consistent with what you see in inertial navigation systems. And our live webcam demo confirmed that the Lucas-Kanade implementation can run in real time, successfully detecting motion direction and magnitude.
+
+To conclude: we implemented all six quadrature methods plus numerical differentiation in our \texttt{tools.py} library and applied them to a 2D optical flow problem. The Lucas-Kanade method accurately recovered velocity vectors using the A-transpose-A inverse times A-transpose-b formula. Together, numerical differentiation, matrix-based flow estimation, and numerical integration form a complete motion-tracking pipeline applicable to robotics, autonomous vehicles, and computer vision.
+
+Thank you for your attention. Are there any questions?
+}
+
+\end{huge}
+\end{document}
