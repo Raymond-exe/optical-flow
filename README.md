@@ -9,7 +9,7 @@ A Python implementation of the **Lucas-Kanade optical flow** algorithm built fro
 
 ## 👥 Team
 
-Jake Davila · Jack Gaon · **Jacky Li** · Virgil Nhieu · Elijah Perez · Richie Wong
+Jake Davila · Jack Gaon · **Jacky Li** · Virgil Nhieu · Elijah Perez · Josiah Wiggins · Richie Wong
 
 ---
 
@@ -149,9 +149,13 @@ All methods are implemented as class methods with **no plots or prints** — vis
 
 Simpson's 1/3 and 3/8 rules converge as **O(h⁴)**, dramatically outperforming the O(h²) Trapezoidal and Midpoint rules.
 
+![Quadrature Convergence](unit03_single_integral_comparison.png)
+
 ### Optical Flow — Figure-8 Trajectory
 
 The unit test differentiates position → velocity, then integrates velocity → reconstructed position, with close agreement to the analytical truth.
+
+![Optical Flow Results](unit03_optical_flow.png)
 
 ### Lucas-Kanade Matrix Calculation
 
