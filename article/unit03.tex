@@ -74,31 +74,26 @@ to~1000.
 
 \section{Introduction}
 
-Numerical differentiation approximates a derivative from discrete data, while
-numerical integration (quadrature) approximates definite integrals.  Both are
-essential in signal processing, control systems, and computer vision.
+Numerical differentiation and numerical integration are fundamental tools in scientific computing. Numerical differentiation is used to approximate derivatives from discrete data, while numerical integration, also called quadrature, is used to approximate definite integrals. These methods are widely used in applications such as signal processing, control systems, and computer vision.
 
-\textbf{Optical flow} is the apparent motion of brightness patterns in an
-image sequence.  The Lucas-Kanade algorithm estimates flow by combining:
+One important application in computer vision is \textbf{optical flow}, which describes the apparent motion of brightness patterns between consecutive image frames. The Lucas-Kanade method estimates this motion by combining three main numerical ideas:
 \begin{enumerate}
-  \item \textbf{Numerical differentiation} --- spatial and temporal intensity
-        gradients $I_x$, $I_y$, $I_t$.
-  \item \textbf{Matrix calculation} --- solving $(\mathbf{A}^T\mathbf{A})\,
-        \mathbf{d} = \mathbf{A}^T\mathbf{b}$ for the velocity vector.
-  \item \textbf{Numerical integration} --- accumulating velocity to obtain
-        displacement (trajectory).
+  \item \textbf{Numerical differentiation} --- computing the spatial and temporal image gradients $I_x$, $I_y$, and $I_t$.
+  \item \textbf{Matrix computation} --- solving the linear system $(\mathbf{A}^T\mathbf{A})\,\mathbf{d} = \mathbf{A}^T\mathbf{b}$ to estimate the local velocity vector.
+  \item \textbf{Numerical integration} --- accumulating velocity over time to recover displacement and reconstruct the trajectory.
 \end{enumerate}
 
-In this report we implement four single-integral and two double-integral
-quadrature methods, compare their convergence, and demonstrate all three
-components on a 2D tracking problem.
+In this report, four single-integral quadrature methods and two double-integral quadrature methods are implemented and compared in terms of convergence and accuracy. These methods are then applied to a 2D motion-tracking example to demonstrate how numerical differentiation, matrix-based estimation, and numerical integration work together in practice.
 
 
 \section{Background}
 
 \subsection{Four Single-Integral Quadrature Rules}
 
+These numerical integration methods approximate the value of a definite integral by replacing the continuous area under a curve with weighted sums of function values at selected points. Each rule differs in accuracy and in how the sample points are used.
+
 \subsubsection{Trapezoidal Rule}
+The trapezoidal rule approximates the area under the curve by dividing the interval into small subintervals and treating each section as a trapezoid. It is simple and effective for smoothly varying functions.
 \begin{equation}
   \int_a^b f(x)\,dx \approx \frac{h}{2}\bigl[f(x_0) + 2\textstyle\sum_{i=1}^{n-1} f(x_i) + f(x_n)\bigr]
   \label{eq:trap}
@@ -106,20 +101,23 @@ components on a 2D tracking problem.
 Error: $O(h^2)$.
 
 \subsubsection{Simpson's 1/3 Rule}
+Simpson's 1/3 rule uses parabolic arcs instead of straight lines to approximate the function over pairs of subintervals. Because of this, it is generally more accurate than the trapezoidal rule for smooth data.
 \begin{equation}
   \int_a^b f\,dx \approx \frac{h}{3}\bigl[f_0 + 4\textstyle\sum_{\text{odd}} f_i + 2\textstyle\sum_{\text{even}} f_i + f_n\bigr]
   \label{eq:s13}
 \end{equation}
-Error: $O(h^4)$.  Requires $n$ even.
+Error: $O(h^4)$. Requires $n$ even.
 
 \subsubsection{Simpson's 3/8 Rule}
+Simpson's 3/8 rule is another higher-order method based on cubic interpolation across three subintervals at a time. It is useful when the number of subintervals is a multiple of three.
 \begin{equation}
   \int_a^b f\,dx \approx \frac{3h}{8}\bigl[f_0 + 3\textstyle\sum_{i\not\equiv 0} f_i + 2\textstyle\sum_{i\equiv 0} f_i + f_n\bigr]
   \label{eq:s38}
 \end{equation}
-Error: $O(h^4)$.  Requires $n$ divisible by~3.
+Error: $O(h^4)$. Requires $n$ divisible by~3.
 
 \subsubsection{Midpoint Rule}
+The midpoint rule estimates the integral by evaluating the function at the center of each subinterval. It is often more accurate than using left or right endpoint estimates and works well for many smooth functions.
 \begin{equation}
   \int_a^b f\,dx \approx h \sum_{i=0}^{n-1} f\!\left(\frac{x_i + x_{i+1}}{2}\right)
   \label{eq:mid}
@@ -127,14 +125,15 @@ Error: $O(h^4)$.  Requires $n$ divisible by~3.
 Error: $O(h^2)$.
 
 \subsection{Double Integration}
-Extend the 1D rules to two dimensions by applying them in each direction
-(tensor-product quadrature):
+To approximate a double integral over a rectangular region, the one-dimensional quadrature rules can be extended by applying them in both the $x$- and $y$-directions. This process is called tensor-product quadrature and is useful for estimating areas, volumes, or accumulated quantities over 2D domains.
 \begin{equation}
   \iint_R f(x,y)\,dx\,dy \approx \sum_i \sum_j w_{ij}\, f(x_i, y_j)
   \label{eq:double}
 \end{equation}
 
 \subsection{Numerical Differentiation}
+Numerical differentiation estimates the derivative of a function using nearby sampled values. This is especially useful when an exact derivative is difficult to obtain or when working with discrete experimental or simulated data.
+
 Central finite difference:
 \begin{equation}
   f'(x_i) \approx \frac{f(x_{i+1}) - f(x_{i-1})}{2h}
@@ -178,7 +177,11 @@ The workflow is:
 
 \section{Implementation}
 
+This section presents the numerical methods implemented in Python for integration, differentiation, and optical flow estimation. Each method is designed to support the motion-tracking analysis performed in this project.
+
 \subsection{Single Integral (Trapezoidal)}
+The trapezoidal integration function approximates the value of a definite integral by dividing the interval into \(n\) subintervals, evaluating the function at equally spaced points, and summing the areas of the resulting trapezoids. This provides a simple and efficient way to numerically estimate the accumulated quantity under a curve.
+
 \begin{lstlisting}
 def integrate_trapezoidal(self, f, a, b, n):
     h = (b - a) / n
@@ -188,6 +191,8 @@ def integrate_trapezoidal(self, f, a, b, n):
 \end{lstlisting}
 
 \subsection{Numerical Differentiation}
+The differentiation function computes the numerical derivative of discrete data using the central difference method for interior points. At the endpoints, forward and backward differences are used because neighboring points on both sides are not available. This method is used to estimate velocity components from sampled position data.
+
 \begin{lstlisting}
 def differentiate(self, y, h, method='central'):
     n = len(y); dy = np.zeros(n)
@@ -199,6 +204,8 @@ def differentiate(self, y, h, method='central'):
 \end{lstlisting}
 
 \subsection{Lucas-Kanade Matrix Solution}
+The Lucas-Kanade implementation estimates motion by forming a linear system from the spatial image gradients \(I_x\), \(I_y\), and the temporal gradient \(I_t\). These values are assembled into a matrix equation, and the flow vector is obtained by solving the least-squares normal equations. This produces an estimate of the local optical flow in the horizontal and vertical directions.
+
 \begin{lstlisting}
 A = np.column_stack([Ix, Iy])  # Nx2
 b = -It                        # Nx1
@@ -279,13 +286,7 @@ differentiation and integration methods reduce this drift.
 
 \section{Conclusion}
 
-We implemented four single-integral and two double-integral quadrature methods,
-plus numerical differentiation, and applied them to a 2D optical flow problem.
-Simpson's rules converge as $O(h^4)$ vs.\ $O(h^2)$ for Trapezoidal/Midpoint.
-The Lucas-Kanade matrix calculation accurately recovers the velocity vector.
-Numerical differentiation and integration together form a complete
-motion-tracking pipeline applicable to cursor tracking, robotics, and
-computer vision.
+We implemented quadrature and numerical differentiation methods for a 2D optical flow problem. Simpson's rules converge as $O(h^4)$, while Trapezoidal and Midpoint converge as $O(h^2)$. The Lucas-Kanade method recovers the velocity vector, and differentiation with integration forms a motion-tracking pipeline for robotics and computer vision.
 
 \small
 \begin{thebibliography}{9}
