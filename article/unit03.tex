@@ -214,18 +214,24 @@ ATb = A.T @ b                  # 2x1
 flow = np.linalg.inv(ATA) @ ATb
 \end{lstlisting}
 
-\subsection{Optical Flow with Sobel Gradients (tools.py)}
-The \texttt{optical\_flow\_lk} method in \texttt{tools.py} computes real
-optical flow between two grayscale frames.  Sobel operators approximate the
-spatial gradients $I_x$ and $I_y$, and the temporal gradient is simply the
-frame difference.
+\subsection{Optical Flow with Our Differentiate Method (tools.py)}
+The \texttt{optical\_flow\_lk} method computes real optical flow between two
+grayscale frames using \textbf{our own} \texttt{self.differentiate} method
+for spatial gradients $I_x$ and $I_y$, applied row-by-row and column-by-column.
+A $7 \times 7$ Gaussian blur is applied first to suppress sensor noise.
 
 \begin{lstlisting}
 def optical_flow_lk(self, frame1, frame2, win=7):
-    Ix = cv2.Sobel(frame2, cv2.CV_32F, 1, 0, ksize=5)
-    Iy = cv2.Sobel(frame2, cv2.CV_32F, 0, 1, ksize=5)
-    return self.lucas_kanade_matrix(
-               Ix, Iy, (frame2 - frame1), win)
+    f1 = cv2.GaussianBlur(np.float32(frame1), (7,7), 0)
+    f2 = cv2.GaussianBlur(np.float32(frame2), (7,7), 0)
+    # Ix: differentiate each row (our central difference)
+    for r in range(h):
+        Ix[r,:] = self.differentiate(f2[r,:], 1.0)
+    # Iy: differentiate each column
+    for c in range(w):
+        Iy[:,c] = self.differentiate(f2[:,c], 1.0)
+    It = f2 - f1  # temporal finite difference
+    return self.lucas_kanade_matrix(Ix, Iy, It, win)
 \end{lstlisting}
 
 \subsection{Window-Based Lucas-Kanade (tools.py)}
@@ -257,18 +263,17 @@ def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
 \subsection{Live Webcam Demo}
 A real-time demonstration (\texttt{webcam\_demo.py}) applies
 \texttt{optical\_flow\_lk} to each pair of consecutive webcam frames.
-Several noise-reduction techniques are employed:
+The demo uses \textbf{all three} categories of our numerical methods:
 \begin{itemize}
-  \item \textbf{Gaussian blur} ($5 \times 5$) before Sobel gradient
-        computation to suppress sensor noise in bright regions.
-  \item \textbf{Magnitude thresholding}: flow vectors below a minimum
-        magnitude are zeroed out, eliminating spurious motion from
-        auto-exposure flickering.
-  \item \textbf{Eigenvalue thresholding}: windows with weak texture
-        (small $\det(\mathbf{A}^T\mathbf{A})$) are skipped.
+  \item \textbf{Differentiation}: \texttt{self.differentiate} computes
+        spatial gradients $I_x$, $I_y$ (central finite differences).
+  \item \textbf{Integration}: \texttt{integrate\_trapezoidal} accumulates
+        flow over time to produce a running trajectory displacement
+        $(\Delta x, \Delta y)$.
+  \item \textbf{Noise reduction}: Gaussian blur ($7 \times 7$),
+        magnitude threshold ($< 1.0$ zeroed out), and determinant
+        check on $\mathbf{A}^T\mathbf{A}$.
 \end{itemize}
-The estimated flow is encoded as HSV (hue~= direction, value~= magnitude)
-and overlaid on the live feed with a color-wheel legend.
 
 
 \section{Results}

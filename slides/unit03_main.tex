@@ -331,15 +331,18 @@ flow = np.linalg.inv(ATA) @ ATb  # [u, v]
 
 \begin{lstlisting}
 def optical_flow_lk(self, frame1, frame2, win=7):
-    f1, f2 = np.float32(frame1), np.float32(frame2)
-    f1 = cv2.GaussianBlur(f1, (5,5), 0)  # denoise
-    f2 = cv2.GaussianBlur(f2, (5,5), 0)
-    Ix = cv2.Sobel(f2, cv2.CV_32F, 1, 0, ksize=5)
-    Iy = cv2.Sobel(f2, cv2.CV_32F, 0, 1, ksize=5)
-    return self.lucas_kanade_matrix(Ix, Iy, f2-f1, win)
+    f1 = cv2.GaussianBlur(np.float32(frame1),(7,7),0)
+    f2 = cv2.GaussianBlur(np.float32(frame2),(7,7),0)
+    # Use OUR differentiate (not cv2.Sobel)
+    for r in range(h):
+        Ix[r,:] = self.differentiate(f2[r,:], 1.0)
+    for c in range(w):
+        Iy[:,c] = self.differentiate(f2[:,c], 1.0)
+    It = f2 - f1
+    return self.lucas_kanade_matrix(Ix, Iy, It, win)
 
 def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
-    # For each pixel window, solve 2x2 system directly:
+    # 2x2 direct solve per pixel window:
     sxx, sxy, syy = dot(ix,ix), dot(ix,iy), dot(iy,iy)
     det = sxx*syy - sxy*sxy
     if det < tau*tau: continue  # skip singular
@@ -362,21 +365,22 @@ def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
 \textbf{Pipeline:}
 \begin{enumerate}
   \item Capture consecutive webcam frames
-  \item Downscale for speed (\texttt{scale = 0.10})
-  \item \textbf{Gaussian blur} to suppress sensor noise
-  \item Call \texttt{tool.optical\_flow\_lk(prev, curr)}
-  \item \textbf{Magnitude threshold} to filter flicker
+  \item Downscale for speed (\texttt{scale = 0.05})
+  \item \textbf{Gaussian blur} ($7 \times 7$) to denoise
+  \item \texttt{tool.optical\_flow\_lk} uses \texttt{self.differentiate}
+  \item Magnitude $< 1.0$ zeroed out
+  \item \texttt{integrate\_trapezoidal} accumulates trajectory
   \item Encode flow as HSV, overlay on video
 \end{enumerate}
 
 \columnbreak
 
-\textbf{Noise Reduction:}
+\textbf{Methods Used:}
 \begin{itemize}
-  \item Gaussian blur ($5 \times 5$) before Sobel
-  \item NaN/Inf guard on each window
-  \item Determinant check (skip singular $\mathbf{A}^T\mathbf{A}$)
-  \item Flow magnitude $< 0.3$ zeroed out
+  \item \texttt{differentiate()} --- spatial gradients $I_x$, $I_y$
+  \item \texttt{integrate\_trapezoidal()} --- trajectory $\Delta x, \Delta y$
+  \item \texttt{lucas\_kanade\_matrix()} --- flow solve
+  \item NaN guard + determinant check
 \end{itemize}
 
 \vspace{0.15in}
