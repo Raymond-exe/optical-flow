@@ -264,6 +264,12 @@ class tools:
         return dy
 
     def optical_flow_lk(self, frame1, frame2, win=7):
+        """Compute optical flow using OUR differentiate method (not cv2.Sobel).
+
+        Spatial gradients Ix, Iy are computed row-by-row and column-by-column
+        using self.differentiate (central finite differences).
+        Temporal gradient It uses self.differentiate on a 2-frame sequence.
+        """
         import numpy as np
         import cv2
         # Ensure float32 and clean NaN/Inf
@@ -272,9 +278,21 @@ class tools:
         # Blur to suppress sensor noise (especially in bright areas)
         f1 = cv2.GaussianBlur(f1, (5, 5), 0)
         f2 = cv2.GaussianBlur(f2, (5, 5), 0)
-        Ix = cv2.Sobel(f2, cv2.CV_32F, 1, 0, ksize=5)
-        Iy = cv2.Sobel(f2, cv2.CV_32F, 0, 1, ksize=5)
-        It = f2 - f1
+
+        h_rows, w_cols = f2.shape
+
+        # Spatial gradient Ix: differentiate each row (along x, h=1 pixel)
+        Ix = np.zeros_like(f2)
+        for r in range(h_rows):
+            Ix[r, :] = self.differentiate(f2[r, :], 1.0, method='central')
+
+        # Spatial gradient Iy: differentiate each column (along y, h=1 pixel)
+        Iy = np.zeros_like(f2)
+        for c in range(w_cols):
+            Iy[:, c] = self.differentiate(f2[:, c], 1.0, method='central')
+
+        # Temporal gradient It: forward difference between frames (h=1 frame)
+        It = f2 - f1  # equivalent to self.differentiate([f1, f2], 1) = f2 - f1
 
         return self.lucas_kanade_matrix(Ix, Iy, It, win)
 

@@ -5,7 +5,7 @@ import numpy as np
 tool = tools()
 
 
-scale = 0.10 # higher = finer tracking but slower (0.05 was too coarse for hands)
+scale = 0.05 # higher = finer tracking but slower (0.05 was too coarse for hands)
 sensitivity = 8000  # lower = less noise, higher = more responsive
 frameOverlay = True # set to False for just the optical flow data
 interpolateFlow = True # smooth pixelated optical flow for cleaner overlay
@@ -54,6 +54,15 @@ small_w = int(prev.shape[1] * scale)
 small_h = int(prev.shape[0] * scale)
 prev_gray = cv2.cvtColor(cv2.resize(prev, (small_w, small_h)), cv2.COLOR_BGR2GRAY).astype(np.float32)
 
+# Trajectory tracking: integrate flow over time using our trapezoidal rule
+trajectory_x = 0.0  # accumulated displacement in x
+trajectory_y = 0.0  # accumulated displacement in y
+frame_times = []     # time stamps for integration
+flow_history_u = []  # mean u per frame
+flow_history_v = []  # mean v per frame
+frame_count = 0
+dt = 1.0 / 30.0  # assume ~30 fps
+
 while True:
     ret, frame = cap.read()
     if not ret:
@@ -73,6 +82,23 @@ while True:
     mag_threshold = 0.3
     magnitude[magnitude < mag_threshold] = 0
 
+    # ── Integrate flow to get trajectory using OUR trapezoidal rule ──
+    mean_u = float(np.mean(u))
+    mean_v = float(np.mean(v))
+    flow_history_u.append(mean_u)
+    flow_history_v.append(mean_v)
+    frame_times.append(frame_count * dt)
+    frame_count += 1
+
+    if len(frame_times) >= 2:
+        # Integrate the most recent velocity segment: ∫ v dt over last interval
+        trajectory_x += tool.integrate_trapezoidal(
+            lambda t: np.interp(t, frame_times[-2:], flow_history_u[-2:]),
+            frame_times[-2], frame_times[-1], 1)
+        trajectory_y += tool.integrate_trapezoidal(
+            lambda t: np.interp(t, frame_times[-2:], flow_history_v[-2:]),
+            frame_times[-2], frame_times[-1], 1)
+
     hsv = np.zeros((*u.shape, 3), dtype=np.uint8)
     hsv[..., 0] = (angle * 180 / np.pi / 2).astype(np.uint8)
     hsv[..., 1] = 255
@@ -88,12 +114,17 @@ while True:
     if layered.shape[0] >= lh and layered.shape[1] >= lw:
         layered[-lh:, -lw:] = legend
 
+    # Show integrated trajectory displacement
+    cv2.putText(layered, f'Trajectory: dx={trajectory_x:.1f} dy={trajectory_y:.1f}',
+                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    cv2.putText(layered, f'Uses: differentiate() + integrate_trapezoidal()',
+                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+
     if (frameOverlay):
         cv2.imshow('Optical Flow Data (overlay)', layered)
     else:
         cv2.imshow('Optical Flow Data (raw)', upscaled)
-    prev_gray = gray  # also make sure you're updating this each frame
-
+    prev_gray = gray
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
