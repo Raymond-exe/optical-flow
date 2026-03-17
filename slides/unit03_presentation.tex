@@ -450,15 +450,18 @@ Below that is the Lucas-Kanade matrix calculation as it appears in \texttt{unit0
 
 \begin{lstlisting}
 def optical_flow_lk(self, frame1, frame2, win=7):
-    f1, f2 = np.float32(frame1), np.float32(frame2)
-    f1 = cv2.GaussianBlur(f1, (5,5), 0)  # denoise
-    f2 = cv2.GaussianBlur(f2, (5,5), 0)
-    Ix = cv2.Sobel(f2, cv2.CV_32F, 1, 0, ksize=5)
-    Iy = cv2.Sobel(f2, cv2.CV_32F, 0, 1, ksize=5)
-    return self.lucas_kanade_matrix(Ix, Iy, f2-f1, win)
+    f1 = cv2.GaussianBlur(np.float32(frame1),(7,7),0)
+    f2 = cv2.GaussianBlur(np.float32(frame2),(7,7),0)
+    # Use OUR differentiate (not cv2.Sobel)
+    for r in range(h):
+        Ix[r,:] = self.differentiate(f2[r,:], 1.0)
+    for c in range(w):
+        Iy[:,c] = self.differentiate(f2[:,c], 1.0)
+    It = f2 - f1
+    return self.lucas_kanade_matrix(Ix, Iy, It, win)
 
 def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
-    # For each pixel window, solve 2x2 system directly:
+    # 2x2 direct solve per pixel window:
     sxx, sxy, syy = dot(ix,ix), dot(ix,iy), dot(iy,iy)
     det = sxx*syy - sxy*sxy
     if det < tau*tau: continue  # skip singular
@@ -471,9 +474,9 @@ def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
 \speakernotes{Richie Wong}{%
 This is the production-quality optical flow code in \texttt{tools.py} that powers our live demo.
 
-The \texttt{optical\_flow\_lk} function takes two grayscale frames. First, we cast them to float-32 and apply a 5-by-5 \textbf{Gaussian blur} to suppress sensor noise --- especially the white-noise flicker you get from webcam auto-exposure. Then we compute the spatial gradients I-x and I-y using \textbf{Sobel operators} with a kernel size of 5. The temporal gradient is simply frame-2 minus frame-1. We pass all three gradient images to \texttt{lucas\_kanade\_matrix}.
+The \texttt{optical\_flow\_lk} function takes two grayscale frames. First, we cast them to float-32 and apply a 7-by-7 \textbf{Gaussian blur} to suppress sensor noise --- especially the white-noise flicker you get from webcam auto-exposure. Then, crucially, we compute the spatial gradients I-x and I-y using \textbf{our own \texttt{self.differentiate} method} --- the same central difference function we wrote for the unit test --- applied row-by-row and column-by-column. We deliberately chose not to use OpenCV's Sobel operator so that the entire pipeline uses the numerical methods we implemented ourselves. The temporal gradient is simply frame-2 minus frame-1, which is a forward finite difference.
 
-In \texttt{lucas\_kanade\_matrix}, we slide a 7-by-7 window over every pixel. For each window, we flatten the gradient patches and compute the three dot products that form the 2-by-2 A-transpose-A matrix: s-x-x, s-x-y, and s-y-y. We check the determinant --- if it is below a threshold tau-squared, we skip that pixel because the system is essentially singular. Otherwise, we solve the 2-by-2 system directly using Cramer's rule, which is faster than calling a general matrix inverse. This produces the flow vectors u and v for every pixel. Let me now hand it off to Jacky for the live demo.
+In \texttt{lucas\_kanade\_matrix}, we slide a 7-by-7 window over every pixel. For each window, we compute the three dot products that form the 2-by-2 A-transpose-A matrix and check the determinant. If it is below a threshold, we skip that pixel. Otherwise, we solve the 2-by-2 system directly using Cramer's rule. Let me now hand it off to Jacky for the live demo.
 }
 
 \newpage
@@ -491,21 +494,22 @@ In \texttt{lucas\_kanade\_matrix}, we slide a 7-by-7 window over every pixel. Fo
 \textbf{Pipeline:}
 \begin{enumerate}
   \item Capture consecutive webcam frames
-  \item Downscale for speed (\texttt{scale = 0.10})
-  \item \textbf{Gaussian blur} to suppress sensor noise
-  \item Call \texttt{tool.optical\_flow\_lk(prev, curr)}
-  \item \textbf{Magnitude threshold} to filter flicker
+  \item Downscale for speed (\texttt{scale = 0.05})
+  \item \textbf{Gaussian blur} ($7 \times 7$) to denoise
+  \item \texttt{tool.optical\_flow\_lk} uses \texttt{self.differentiate}
+  \item Magnitude $< 1.0$ zeroed out
+  \item \texttt{integrate\_trapezoidal} accumulates trajectory
   \item Encode flow as HSV, overlay on video
 \end{enumerate}
 
 \columnbreak
 
-\textbf{Noise Reduction:}
+\textbf{Methods Used:}
 \begin{itemize}
-  \item Gaussian blur ($5 \times 5$) before Sobel
-  \item NaN/Inf guard on each window
-  \item Determinant check (skip singular $\mathbf{A}^T\mathbf{A}$)
-  \item Flow magnitude $< 0.3$ zeroed out
+  \item \texttt{differentiate()} --- spatial gradients $I_x$, $I_y$
+  \item \texttt{integrate\_trapezoidal()} --- trajectory $\Delta x, \Delta y$
+  \item \texttt{lucas\_kanade\_matrix()} --- flow solve
+  \item NaN guard + determinant check
 \end{itemize}
 
 \vspace{0.15in}
@@ -519,11 +523,9 @@ Now I am going to run a live demonstration. Let me switch to the terminal and la
 
 \textbf{[DEMO CUE: Open terminal, run ``python webcam\_demo.py''. Show the webcam feed with optical flow overlay.]}
 
-What you are seeing is our Lucas-Kanade implementation running in real time on the webcam feed. The pipeline works as follows: we capture pairs of consecutive frames, downscale them to 10 percent of the original resolution for speed, apply a Gaussian blur, and then call our \texttt{optical\_flow\_lk} function from tools.py.
+What you are seeing is our Lucas-Kanade implementation running in real time on the webcam feed. Importantly, the spatial gradients I-x and I-y are computed using \textbf{our own \texttt{differentiate} method} --- the same central finite difference function from tools.py --- not OpenCV's Sobel. We also use \texttt{integrate\_trapezoidal} to accumulate the flow over time, producing the trajectory displacement you see in the top-left corner.
 
-The output is encoded in HSV color space --- the \textbf{hue} represents the direction of motion and the \textbf{brightness} represents the speed. You can see the color wheel legend in the bottom-right corner. Notice how when I wave my hand, you see a burst of color in the direction of motion. Areas that are not moving stay dark.
-
-We apply several noise-reduction techniques. The Gaussian blur suppresses high-frequency sensor noise. There is a NaN and infinity guard on each window to handle edge cases. The determinant check skips pixels where the texture is too weak to produce a reliable estimate. And any flow magnitude below 0.3 is zeroed out to suppress the subtle flicker caused by the webcam's auto-exposure.
+The pipeline downscales frames to 5 percent resolution for speed, applies a 7-by-7 Gaussian blur, then calls \texttt{optical\_flow\_lk}. The output is encoded in HSV --- hue is direction, brightness is speed. Any flow magnitude below 1.0 is zeroed out to suppress auto-exposure flicker.
 
 \textbf{[DEMO CUE: Wave hand, move objects, then press q to exit.]}
 
