@@ -276,8 +276,8 @@ class tools:
         f1 = np.nan_to_num(np.float32(frame1), nan=0.0, posinf=0.0, neginf=0.0)
         f2 = np.nan_to_num(np.float32(frame2), nan=0.0, posinf=0.0, neginf=0.0)
         # Blur to suppress sensor noise (especially in bright areas)
-        f1 = cv2.GaussianBlur(f1, (5, 5), 0)
-        f2 = cv2.GaussianBlur(f2, (5, 5), 0)
+        f1 = cv2.GaussianBlur(f1, (7, 7), 0)
+        f2 = cv2.GaussianBlur(f2, (7, 7), 0)
 
         h_rows, w_cols = f2.shape
 

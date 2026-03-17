@@ -5,7 +5,7 @@ import numpy as np
 tool = tools()
 
 
-scale = 0.05 # higher = finer tracking but slower (0.05 was too coarse for hands)
+scale = 0.10 # higher = finer tracking but slower (0.05 was too coarse for hands)
 sensitivity = 8000  # lower = less noise, higher = more responsive
 frameOverlay = True # set to False for just the optical flow data
 interpolateFlow = True # smooth pixelated optical flow for cleaner overlay
@@ -79,7 +79,7 @@ while True:
     magnitude, angle = cv2.cartToPolar(u.astype(np.float32), v.astype(np.float32))
 
     # Zero out tiny motions (auto-exposure / sensor noise)
-    mag_threshold = 0.3
+    mag_threshold = 1.0
     magnitude[magnitude < mag_threshold] = 0
 
     # ── Integrate flow to get trajectory using OUR trapezoidal rule ──
