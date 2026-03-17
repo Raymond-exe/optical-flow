@@ -9,7 +9,7 @@ A Python implementation of the **Lucas-Kanade optical flow** algorithm built fro
 
 ## 👥 Team
 
-Jake Davila · Jack Gaon · Jacky Li · Virgil Nhieu · Elijah Perez · Josiah Wiggins · Richie Wong
+Jared Acosta · Jake Davila · Jack Gaon · Jacky Li · Virgil Nhieu · Elijah Perez · Josiah Wiggins · Richie Wong
 
 ---
 

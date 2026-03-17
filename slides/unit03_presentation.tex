@@ -89,7 +89,7 @@
 {\LARGE \textbf{Optical Flow — Movement Tracking in 2D Space}}
 
 \vspace{0.4in}
-{\Large Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, Richie Wong}
+{\Large Jared Acosta, Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, Richie Wong}
 
 \vspace{0.15in}
 {\Large March 15, 2026}
@@ -98,7 +98,7 @@
 \speakernotes{Josiah Wiggins}{%
 Good afternoon, everyone. We are Group --- presenting Unit 3 of ECE 5110. Today's seminar covers \textbf{Numerical Differentiation and Integration}, and we are going to demonstrate how these fundamental techniques tie into a real computer-vision application called \textbf{optical flow} --- which is essentially tracking movement in two-dimensional space.
 
-Our team consists of Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, and Richie Wong. Over the next several slides, each of us will walk you through a piece of the theory, the implementation, and the results. Let us get started with the outline.
+Our team consists of Jared Acosta, Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, and Richie Wong. Over the next several slides, each of us will walk you through a piece of the theory, the implementation, and the results. Let us get started with the outline.
 }
 
 \newpage
@@ -434,14 +434,14 @@ flow = np.linalg.inv(ATA) @ ATb  # [u, v]
 \speakernotes{Elijah Perez}{%
 Here is the differentiation function. It takes an array of sampled function values and the step size h. For interior points --- from index 1 through n minus 2 --- we use the central difference formula: y of i plus 1 minus y of i minus 1, all divided by 2h. At the boundaries, we fall back to a one-sided formula.
 
-Below that is the Lucas-Kanade matrix calculation as it appears in \texttt{unit03.py}. We stack the spatial gradients I-x and I-y into an N-by-2 matrix A. Then we form A-transpose-A --- a 2-by-2 matrix --- and A-transpose-b. Finally we compute the inverse and multiply to get the flow vector u, v. This matches the formula Virgil showed on the previous slide. Richie is now going to show the full optical flow implementation in tools.py.
+Below that is the Lucas-Kanade matrix calculation as it appears in \texttt{unit03.py}. We stack the spatial gradients I-x and I-y into an N-by-2 matrix A. Then we form A-transpose-A --- a 2-by-2 matrix --- and A-transpose-b. Finally we compute the inverse and multiply to get the flow vector u, v. This matches the formula Virgil showed on the previous slide. Jared is now going to show the full optical flow implementation in tools.py.
 }
 
 \newpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SLIDE 10 — Implementation: optical_flow_lk + lucas_kanade_matrix
-% SPEAKER: Richie Wong
+% SPEAKER: Jared Acosta
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \slideheader{Implementation: Optical Flow in tools.py}{}
 
@@ -529,14 +529,14 @@ The pipeline downscales frames to 5 percent resolution for speed, applies a 7-by
 
 \textbf{[DEMO CUE: Wave hand, move objects, then press q to exit.]}
 
-All right, that wraps up the demo. Let me pass it to Josiah for the results.
+All right, that wraps up the demo. Let me pass it to Jared for the results.
 }
 
 \newpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SLIDE 12 — Results: Quadrature Convergence
-% SPEAKER: Josiah Wiggins
+% SPEAKER: Jared Acosta
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \slideheader{Results: Single Integral Error (n = 10:10:1000)}{Results}
 
@@ -556,7 +556,7 @@ All right, that wraps up the demo. Let me pass it to Josiah for the results.
 
 \leftskip 0in \rightskip 0in
 
-\speakernotes{Josiah Wiggins}{%
+\speakernotes{Jared Acosta}{%
 Here are the convergence results. We tested all four single-integral methods on the function f of t equals 3 sine 2t plus t cosine t, integrated from 0 to pi. The exact answer is negative 2, and we computed the absolute error for step counts from 10 to 1000 in increments of 10.
 
 This is a log-log plot, so straight lines indicate polynomial convergence. You can clearly see \textbf{two distinct groups}. The Simpson one-third and three-eighths rules --- shown in orange and green --- form the upper group with a \textbf{steep slope}, corresponding to order h-to-the-fourth convergence. The Trapezoidal and Midpoint rules --- blue and red --- have a shallower slope, corresponding to order h-squared.
