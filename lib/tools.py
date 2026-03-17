@@ -264,23 +264,45 @@ class tools:
         return dy
 
     def optical_flow_lk(self, frame1, frame2, win=7):
-        import numpy as np;
-        import cv2;
+        """Compute optical flow using OUR differentiate method (not cv2.Sobel).
 
-        frame1 = np.nan_to_num(frame1, nan=0.0, posinf=0.0, neginf=0.0)
-        frame2 = np.nan_to_num(frame2, nan=0.0, posinf=0.0, neginf=0.0)
+        Spatial gradients Ix, Iy are computed row-by-row and column-by-column
+        using self.differentiate (central finite differences).
+        Temporal gradient It uses self.differentiate on a 2-frame sequence.
+        """
+        import numpy as np
+        import cv2
+        # Ensure float32 and clean NaN/Inf
+        f1 = np.nan_to_num(np.float32(frame1), nan=0.0, posinf=0.0, neginf=0.0)
+        f2 = np.nan_to_num(np.float32(frame2), nan=0.0, posinf=0.0, neginf=0.0)
+        # Blur to suppress sensor noise (especially in bright areas)
+        f1 = cv2.GaussianBlur(f1, (7, 7), 0)
+        f2 = cv2.GaussianBlur(f2, (7, 7), 0)
 
-        Ix = cv2.Sobel(frame2, cv2.CV_32F, 1, 0, ksize=5)
-        Iy = cv2.Sobel(frame2, cv2.CV_32F, 0, 1, ksize=5)
+        h_rows, w_cols = f2.shape
 
-        return self.lucas_kanade_matrix(Ix, Iy, (frame2-frame1), win)
+        # Spatial gradient Ix: differentiate each row (along x, h=1 pixel)
+        Ix = np.zeros_like(f2)
+        for r in range(h_rows):
+            Ix[r, :] = self.differentiate(f2[r, :], 1.0, method='central')
+
+        # Spatial gradient Iy: differentiate each column (along y, h=1 pixel)
+        Iy = np.zeros_like(f2)
+        for c in range(w_cols):
+            Iy[:, c] = self.differentiate(f2[:, c], 1.0, method='central')
+
+        # Temporal gradient It: forward difference between frames (h=1 frame)
+        It = f2 - f1  # equivalent to self.differentiate([f1, f2], 1) = f2 - f1
+
+        return self.lucas_kanade_matrix(Ix, Iy, It, win)
 
     def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
-        import numpy as np;
+        import numpy as np
         h, w = Ix.shape
-        u = np.zeros((h, w))
-        v = np.zeros((h, w))
+        u = np.zeros((h, w), dtype=np.float32)
+        v = np.zeros((h, w), dtype=np.float32)
         half = win // 2
+        tau = 0.1  # eigenvalue threshold (higher = less noise)
 
         for y in range(half, h - half):
             for x in range(half, w - half):
@@ -288,15 +310,29 @@ class tools:
                 iy = Iy[y-half:y+half+1, x-half:x+half+1].flatten()
                 it = It[y-half:y+half+1, x-half:x+half+1].flatten()
 
-                A = np.column_stack([ix, iy])
-                b = -it
-
-                ATA = A.T @ A
-                if np.min(np.linalg.eigvals(ATA)) < 1e-3:
+                # Skip windows with NaN/Inf
+                if not (np.all(np.isfinite(ix)) and np.all(np.isfinite(iy))
+                        and np.all(np.isfinite(it))):
                     continue
 
-                flow = np.linalg.inv(ATA) @ (A.T @ b)
-                u[y, x] = flow[0]
-                v[y, x] = flow[1]
+                # Build A^T A directly (2x2) — faster than full matmul
+                sxx = np.dot(ix, ix)
+                sxy = np.dot(ix, iy)
+                syy = np.dot(iy, iy)
+
+                # Fast eigenvalue check for 2x2: both eigenvalues > tau
+                # if trace > 2*tau and determinant > tau^2
+                trace = sxx + syy
+                det = sxx * syy - sxy * sxy
+                if trace < 2 * tau or det < tau * tau:
+                    continue
+
+                # Solve [sxx sxy; sxy syy] * [u; v] = -[dot(ix,it); dot(iy,it)]
+                bx = -np.dot(ix, it)
+                by = -np.dot(iy, it)
+
+                inv_det = 1.0 / det
+                u[y, x] = inv_det * (syy * bx - sxy * by)
+                v[y, x] = inv_det * (-sxy * bx + sxx * by)
 
         return u, v

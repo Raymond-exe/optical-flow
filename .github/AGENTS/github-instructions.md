@@ -9,12 +9,15 @@ NumericalModeling/
 │   │   ├── create-function-in-lib.md
 │   │   ├── create-slides.md
 │   │   ├── create-article.md
-│   │   └── create-unit-test.md
+│   │   ├── create-unit-test.md
+│   │   └── create-presentation-script.md
 │   └── AGENTS/
-│       └── github-instructions.md  (this file)
+│       ├── github-instructions.md  (this file)
+│       └── presentation-workflow.md
 ├── templates/                    # LaTeX templates
 │   ├── article_template.tex
-│   └── slides_template.tex
+│   ├── slides_template.tex
+│   └── presentation_template.tex # Multi-speaker script template
 ├── lib/
 │   └── tools.py                  # All numerical methods (no plots/prints)
 ├── article/                      # LaTeX articles (IS&T format)
@@ -22,7 +25,8 @@ NumericalModeling/
 │   └── unit03.tex
 ├── slides/                       # LaTeX slides (extarticle landscape)
 │   ├── unit02_main.tex
-│   └── unit03_main.tex
+│   ├── unit03_main.tex
+│   └── unit03_presentation.tex   # Full script with speaker notes
 ├── unit01.py                     # Unit test: bisection
 ├── unit01_newton.py              # Unit test: Newton root finding
 ├── unit02.py                     # Unit test: interpolation
@@ -36,7 +40,8 @@ NumericalModeling/
 3. **Run unit test** to generate `.png` plots
 4. **Create article** `article/unit<NN>.tex` (follow `create-article.md`)
 5. **Create slides** `slides/unit<NN>_main.tex` (follow `create-slides.md`)
-6. **Upload** `.tex` + `.png` files to Overleaf and compile
+6. **Create presentation script** `slides/unit<NN>_presentation.tex` (follow `create-presentation-script.md`)
+7. **Upload** `.tex` + `.png` files to Overleaf and compile
 
 ## Conventions
 - Methods in `tools.py` must NOT contain `print()` or `plt` calls
