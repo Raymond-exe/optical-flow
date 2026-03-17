@@ -302,7 +302,7 @@ class tools:
         u = np.zeros((h, w), dtype=np.float32)
         v = np.zeros((h, w), dtype=np.float32)
         half = win // 2
-        tau = 0.1  # eigenvalue threshold (higher = less noise)
+        tau = 0.6  # eigenvalue threshold (higher = less noise)
 
         for y in range(half, h - half):
             for x in range(half, w - half):

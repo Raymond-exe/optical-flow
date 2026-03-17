@@ -114,12 +114,6 @@ while True:
     if layered.shape[0] >= lh and layered.shape[1] >= lw:
         layered[-lh:, -lw:] = legend
 
-    # Show integrated trajectory displacement
-    cv2.putText(layered, f'Trajectory: dx={trajectory_x:.1f} dy={trajectory_y:.1f}',
-                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-    cv2.putText(layered, f'Uses: differentiate() + integrate_trapezoidal()',
-                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-
     if (frameOverlay):
         cv2.imshow('Optical Flow Data (overlay)', layered)
     else:
