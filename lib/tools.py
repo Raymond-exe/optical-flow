@@ -267,6 +267,9 @@ class tools:
         import numpy as np;
         import cv2;
 
+        frame1 = cv2.GaussianBlur(frame1, (5,5), 0)  # denoise
+        frame2 = cv2.GaussianBlur(frame2, (5,5), 0)
+
         frame1 = np.nan_to_num(frame1, nan=0.0, posinf=0.0, neginf=0.0)
         frame2 = np.nan_to_num(frame2, nan=0.0, posinf=0.0, neginf=0.0)
 
