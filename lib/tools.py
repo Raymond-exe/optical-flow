@@ -78,6 +78,74 @@ class tools:
 
         return x, -1, history
 
+    def solve_lsoe(self, A, B):
+        """Solve a linear system Ax = B using Gaussian elimination
+        with scaled partial pivoting + back substitution.
+
+        Based on the MATLAB function_solve_lsoe from ECE 5110.
+
+        Steps:
+            1. Row normalization (scale each row by its max abs value)
+            2. Partial pivoting (swap rows to maximize pivot)
+            3. Forward elimination (zero out below-diagonal entries)
+            4. Back substitution (solve the upper-triangular system)
+
+        Args:
+            A: n×n coefficient matrix (list of lists or numpy array).
+            B: n×1 right-hand side vector.
+
+        Returns:
+            (solution, error_code)
+            error_code:  0 = success, -1 = singular or incompatible
+        """
+        import numpy as np
+
+        A = np.array(A, dtype=np.float64)
+        B = np.array(B, dtype=np.float64).flatten()
+        n = A.shape[0]
+
+        # Dimension check
+        if A.shape[0] != A.shape[1] or len(B) != n:
+            return np.zeros(n), -1
+
+        # ─── Forward Elimination ───
+        for ix in range(n - 1):
+            # 1. NORMALIZE — scale rows ix..n-1 by their max absolute value
+            for r in range(ix, n):
+                max_row = np.max(np.abs(A[r, ix:]))
+                if max_row < 1e-15:
+                    continue  # skip near-zero rows
+                A[r, ix:] = A[r, ix:] / max_row
+                B[r] = B[r] / max_row
+
+            # 2. PARTIAL PIVOTING — find the row with largest |A[r, ix]|
+            pivot_row = ix + np.argmax(np.abs(A[ix:, ix]))
+            if pivot_row != ix:
+                # Swap rows in A and B
+                A[[ix, pivot_row]] = A[[pivot_row, ix]]
+                B[[ix, pivot_row]] = B[[pivot_row, ix]]
+
+            # Check for zero pivot (singular matrix)
+            if abs(A[ix, ix]) < 1e-15:
+                return np.zeros(n), -1
+
+            # 3. ELIMINATE — zero out entries below A[ix, ix]
+            for r in range(ix + 1, n):
+                factor = A[r, ix] / A[ix, ix]
+                A[r, ix:] = A[r, ix:] - factor * A[ix, ix:]
+                B[r] = B[r] - factor * B[ix]
+
+        # Check last pivot
+        if abs(A[n - 1, n - 1]) < 1e-15:
+            return np.zeros(n), -1
+
+        # ─── 4. BACK SUBSTITUTION ───
+        x = np.zeros(n)
+        for i in range(n - 1, -1, -1):
+            x[i] = (B[i] - np.dot(A[i, i + 1:], x[i + 1:])) / A[i, i]
+
+        return x, 0
+
     def lagrange_interpolate(self, x, y):
         import numpy as np
         n = len(x)
@@ -263,38 +331,61 @@ class tools:
 
         return dy
 
-    def optical_flow_lk(self, frame1, frame2, win=7):
-        """Compute optical flow using OUR differentiate method (not cv2.Sobel).
+    def optical_flow_lk(self, frame1, frame2, win=7, levels=3):
+        """Pyramidal Lucas-Kanade optical flow (Bouguet, 2001).
 
-        Spatial gradients Ix, Iy are computed row-by-row and column-by-column
-        using self.differentiate (central finite differences).
-        Temporal gradient It uses self.differentiate on a 2-frame sequence.
+        Uses a Gaussian image pyramid with `levels` scales.
+        Spatial gradients use self.differentiate (central differences).
+        Flow is computed coarse-to-fine: estimate at the top level, then
+        upsample and refine at each finer level.
         """
         import numpy as np
         import cv2
+
         # Ensure float32 and clean NaN/Inf
         f1 = np.nan_to_num(np.float32(frame1), nan=0.0, posinf=0.0, neginf=0.0)
         f2 = np.nan_to_num(np.float32(frame2), nan=0.0, posinf=0.0, neginf=0.0)
-        # Blur to suppress sensor noise (especially in bright areas)
-        f1 = cv2.GaussianBlur(f1, (7, 7), 0)
-        f2 = cv2.GaussianBlur(f2, (7, 7), 0)
 
-        h_rows, w_cols = f2.shape
+        # Build Gaussian pyramids
+        pyr1 = [cv2.GaussianBlur(f1, (5, 5), 0)]
+        pyr2 = [cv2.GaussianBlur(f2, (5, 5), 0)]
+        for _ in range(1, levels):
+            pyr1.append(cv2.pyrDown(pyr1[-1]))
+            pyr2.append(cv2.pyrDown(pyr2[-1]))
 
-        # Spatial gradient Ix: differentiate each row (along x, h=1 pixel)
-        Ix = np.zeros_like(f2)
-        for r in range(h_rows):
-            Ix[r, :] = self.differentiate(f2[r, :], 1.0, method='central')
+        # Initialize flow at coarsest level
+        u = np.zeros(pyr1[-1].shape, dtype=np.float32)
+        v = np.zeros(pyr1[-1].shape, dtype=np.float32)
 
-        # Spatial gradient Iy: differentiate each column (along y, h=1 pixel)
-        Iy = np.zeros_like(f2)
-        for c in range(w_cols):
-            Iy[:, c] = self.differentiate(f2[:, c], 1.0, method='central')
+        # Coarse-to-fine: compute/refine flow at each level
+        for lev in range(levels - 1, -1, -1):
+            p1 = pyr1[lev]
+            p2 = pyr2[lev]
+            h_rows, w_cols = p1.shape
 
-        # Temporal gradient It: forward difference between frames (h=1 frame)
-        It = f2 - f1  # equivalent to self.differentiate([f1, f2], 1) = f2 - f1
+            # Upsample previous level's flow to current resolution
+            if u.shape != p1.shape:
+                u = cv2.resize(u, (w_cols, h_rows)) * 2.0
+                v = cv2.resize(v, (w_cols, h_rows)) * 2.0
 
-        return self.lucas_kanade_matrix(Ix, Iy, It, win)
+            # Spatial gradients using OUR differentiate method
+            Ix = np.zeros_like(p2)
+            for r in range(h_rows):
+                Ix[r, :] = self.differentiate(p2[r, :], 1.0, method='central')
+            Iy = np.zeros_like(p2)
+            for c in range(w_cols):
+                Iy[:, c] = self.differentiate(p2[:, c], 1.0, method='central')
+
+            # Temporal gradient with auto-exposure compensation
+            It = p2 - p1
+            It = It - np.mean(It)
+
+            # Compute flow refinement at this level
+            du, dv = self.lucas_kanade_matrix(Ix, Iy, It, win)
+            u = u + du
+            v = v + dv
+
+        return u, v
 
     def lucas_kanade_matrix(self, Ix, Iy, It, win=7):
         import numpy as np
@@ -302,7 +393,7 @@ class tools:
         u = np.zeros((h, w), dtype=np.float32)
         v = np.zeros((h, w), dtype=np.float32)
         half = win // 2
-        tau = 0.6  # eigenvalue threshold (higher = less noise)
+        tau = 0.5  # eigenvalue threshold (higher = less noise)
 
         for y in range(half, h - half):
             for x in range(half, w - half):

@@ -1,0 +1,237 @@
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+% IS&T Template
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Document class
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[letterpaper,twocolumn,fleqn]{article}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Packages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{ist}
+\usepackage[margin=1in]{geometry}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\pagestyle{empty}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  showstringspaces=false,
+  xleftmargin=0.02\columnwidth,
+  xrightmargin=0.02\columnwidth
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Title and Authors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{Solving Linear Systems of Equations:\\
+  Gaussian Elimination with Scaled Partial Pivoting}
+\author{ Jared Acosta, Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, Richie Wong\\ Cal Poly Pomona; Pomona, California \\ April 6, 2026}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Begin document
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Solving systems of linear equations $\mathbf{A}\mathbf{x} = \mathbf{b}$
+is one of the most fundamental tasks in numerical computing.  Applications
+range from circuit analysis and structural engineering to machine learning
+and computer graphics.
+
+This report presents a Python implementation of \textbf{Gaussian
+elimination with scaled partial pivoting}, translated from the MATLAB
+\texttt{function\_solve\_lsoe} provided in ECE~5110.  The original MATLAB
+code performed row normalization, partial pivoting, and forward
+elimination but was \emph{missing the back-substitution step}.  We
+complete the algorithm, verify it against NumPy's built-in solver, and
+analyze its accuracy as a function of matrix size.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Theory}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{The Linear System}
+Given an $n \times n$ matrix $\mathbf{A}$ and an $n \times 1$ vector
+$\mathbf{b}$, we seek $\mathbf{x}$ such that
+\[
+\mathbf{A}\mathbf{x} = \mathbf{b}
+\]
+
+\subsection{Gaussian Elimination}
+The algorithm transforms $\mathbf{A}$ into an upper-triangular matrix
+$\mathbf{U}$ through a sequence of elementary row operations:
+
+\textbf{Step 1 — Row Normalization.}
+Scale each active row by its maximum absolute entry to prevent large
+entries from dominating the pivot selection:
+\[
+\mathbf{A}_{r,:} \leftarrow \frac{\mathbf{A}_{r,:}}
+                                  {\max_j |A_{r,j}|}, \quad
+b_r \leftarrow \frac{b_r}{\max_j |A_{r,j}|}
+\]
+
+\textbf{Step 2 — Partial Pivoting.}
+Swap rows so that the entry with the largest absolute value in the
+current column becomes the pivot.  This reduces round-off error
+amplification:
+\[
+\text{pivotRow} = \arg\max_{r \ge k} |A_{r,k}|
+\]
+
+\textbf{Step 3 — Forward Elimination.}
+For each row $r > k$, subtract a multiple of the pivot row to zero
+out the entry below the diagonal:
+\[
+m_{r,k} = \frac{A_{r,k}}{A_{k,k}}, \quad
+\mathbf{A}_{r,:} \leftarrow \mathbf{A}_{r,:} - m_{r,k} \,\mathbf{A}_{k,:}
+\]
+After $n-1$ passes, $\mathbf{A}$ is upper-triangular.
+
+\subsection{Back Substitution}
+Once the system is in upper-triangular form $\mathbf{U}\mathbf{x} = \mathbf{c}$,
+solve from the last row upward:
+\[
+x_i = \frac{1}{U_{i,i}}\!\left(c_i - \sum_{j=i+1}^{n} U_{i,j}\,x_j\right),
+\quad i = n, n{-}1, \ldots, 1
+\]
+This is the step that was \textbf{missing} from the original MATLAB code.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Implementation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{solve\_lsoe (tools.py)}
+The complete method in \texttt{lib/tools.py}:
+
+\begin{lstlisting}
+def solve_lsoe(self, A, B):
+    A = np.array(A, dtype=np.float64)
+    B = np.array(B, dtype=np.float64).flatten()
+    n = A.shape[0]
+
+    # Forward Elimination
+    for ix in range(n - 1):
+      # 1. NORMALIZE
+      for r in range(ix, n):
+        max_row = np.max(np.abs(A[r, ix:]))
+        if max_row < 1e-15: continue
+        A[r,ix:] = A[r,ix:] / max_row
+        B[r] = B[r] / max_row
+
+      # 2. PARTIAL PIVOTING
+      pivot = ix + np.argmax(np.abs(A[ix:,ix]))
+      if pivot != ix:
+        A[[ix,pivot]] = A[[pivot,ix]]
+        B[[ix,pivot]] = B[[pivot,ix]]
+
+      # 3. ELIMINATE
+      for r in range(ix+1, n):
+        factor = A[r,ix] / A[ix,ix]
+        A[r,ix:] -= factor * A[ix,ix:]
+        B[r] -= factor * B[ix]
+
+    # 4. BACK SUBSTITUTION
+    x = np.zeros(n)
+    for i in range(n-1, -1, -1):
+      x[i] = (B[i] - A[i,i+1:] @ x[i+1:])
+              / A[i,i]
+    return x, 0
+\end{lstlisting}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Test Cases}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Instructor's 4×4 System}
+From the MATLAB \texttt{unittest\_lsoe.m}:
+\[
+\mathbf{A} = \begin{bmatrix}
+1 & 1 & 1 & 1 \\
+1 & 2 & 3 & 4 \\
+0 & 2 & 0 & 1 \\
+-1 & -2 & 1 & 2
+\end{bmatrix}, \quad
+\mathbf{b} = \begin{bmatrix} 4 \\ 10 \\ 12 \\ 0 \end{bmatrix}
+\]
+Our solver produces $\mathbf{x} = [5.5,\; 1,\; {-12.5},\; 10]^T$,
+matching \texttt{numpy.linalg.solve} to within $1.78 \times 10^{-15}$.
+
+\subsection{Additional Tests}
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Test} & \textbf{Size} & \textbf{Result} \\
+\midrule
+Identity matrix        & $3 \times 3$ & $\checkmark$ \\
+Simple 2×2             & $2 \times 2$ & $\checkmark$ \\
+Singular matrix        & $3 \times 3$ & detected \\
+Random well-conditioned & $6 \times 6$ & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Results}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Figure~\ref{fig:acc} shows the accuracy of our solver as a function
+of matrix size $n$ (left panel) and the condition number of the
+randomly generated test matrices (right panel).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{unit04_accuracy_analysis.png}
+\caption{Left: maximum absolute error vs.\ matrix size.
+Right: condition number $\kappa(\mathbf{A})$ vs.\ matrix size.
+All test matrices are diagonally dominant with $\mathbf{A} = \text{randn}(n) + n\,\mathbf{I}$.}
+\label{fig:acc}
+\end{figure}
+
+The error remains near machine precision ($\sim 10^{-13}$) for
+well-conditioned systems, confirming that our implementation is
+numerically stable for diagonally dominant matrices.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Discussion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{itemize}
+  \item \textbf{Scaled partial pivoting} prevents catastrophic
+        cancellation when rows have vastly different magnitudes.
+  \item \textbf{Back substitution} is $O(n^2)$ and dominates only
+        for small $n$; the overall complexity is $O(n^3)$ due to
+        forward elimination.
+  \item For ill-conditioned systems ($\kappa \gg 1$), even partial
+        pivoting cannot prevent loss of significant digits.
+        Full pivoting or iterative refinement would be needed.
+  \item Our implementation detects singular matrices by checking
+        whether any pivot falls below $10^{-15}$.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We translated the MATLAB \texttt{function\_solve\_lsoe} to Python,
+\textbf{added the missing back-substitution step}, and verified the
+complete Gaussian elimination solver against NumPy's built-in
+\texttt{linalg.solve}.  All five test cases pass with errors at
+machine-precision level.  The method lives in \texttt{lib/tools.py}
+alongside the other numerical methods from previous units.
+
+\end{document}

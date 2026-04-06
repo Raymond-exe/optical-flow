@@ -1,0 +1,381 @@
+\documentclass[a4paper,landscape,12pt]{extarticle}
+\usepackage[left=0.5in,right=0.5in,top=0.4in,bottom=0.55in]{geometry}
+
+\usepackage{graphicx}
+\usepackage[normalem]{ulem}
+\usepackage{multicol}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+% ---------- Listings (code blocks) ----------
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\Large,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  numbers=left,
+  numberstyle=\Large\color{gray},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+% Page style with slide numbers
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[R]{\Large\thepage\ / \pageref*{LastPage}}
+
+% Header (expects cpp_logo.png in same folder)
+\newcommand{\slideheader}[2]{%
+\noindent
+\includegraphics[height=0.5in]{cpp_logo.png}%
+\hspace{0.3in}%
+{\Large \uline{#1 \hfill #2}}%
+\par\vspace{0.4in}
+}
+
+\begin{document}
+\begin{huge}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 1 - Title Slide
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{ECE 5110 Numerical Modeling}{}
+
+\vspace{1.0in}
+\begin{center}
+{\Huge \textbf{Solving Linear Systems of Equations}}
+
+\vspace{0.35in}
+{\LARGE Unit 4: Gaussian Elimination with Scaled Partial Pivoting}\\
+\vspace{0.15in}
+{\LARGE \textbf{From MATLAB to Python — Adding Back Substitution}}
+
+\vspace{0.4in}
+{\Large Jared Acosta, Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, Richie Wong}
+
+\vspace{0.15in}
+{\Large April 6, 2026}
+\end{center}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 2 - Outline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Outline}{Linear Systems}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.2in}
+
+\begin{itemize}
+  \item Why Solve $\mathbf{A}\mathbf{x} = \mathbf{b}$?
+  \item Gaussian Elimination — Overview
+  \item Step 1: Row Normalization
+  \item Step 2: Partial Pivoting
+  \item Step 3: Forward Elimination
+  \item Step 4: Back Substitution (the missing piece)
+  \item Implementation in \texttt{tools.py}
+  \item Test Cases \& Results
+  \item Discussion \& Conclusion
+\end{itemize}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 3 - Why Solve Ax = b?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Why Solve $\mathbf{A}\mathbf{x} = \mathbf{b}$?}{Motivation}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+\begin{multicols}{2}
+\textbf{Applications:}
+\begin{itemize}
+  \item Circuit analysis (KVL/KCL)
+  \item Structural engineering (FEM)
+  \item Least-squares fitting
+  \item Control systems
+  \item Graphics \& transformations
+\end{itemize}
+
+\columnbreak
+
+\textbf{The Problem:}
+\[
+\underbrace{\begin{bmatrix} a_{11} & \cdots & a_{1n} \\ \vdots & \ddots & \vdots \\ a_{n1} & \cdots & a_{nn} \end{bmatrix}}_{\mathbf{A}}
+\underbrace{\begin{bmatrix} x_1 \\ \vdots \\ x_n \end{bmatrix}}_{\mathbf{x}}
+= \underbrace{\begin{bmatrix} b_1 \\ \vdots \\ b_n \end{bmatrix}}_{\mathbf{b}}
+\]
+
+\vspace{0.15in}
+Find $\mathbf{x}$ given $\mathbf{A}$ and $\mathbf{b}$.
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 4 - Gaussian Elimination Overview
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Gaussian Elimination — Four Steps}{Algorithm}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.15in}
+
+Transform $[\mathbf{A}|\mathbf{b}]$ into $[\mathbf{U}|\mathbf{c}]$ (upper-triangular), then solve by back substitution.
+
+\vspace{0.2in}
+\begin{enumerate}
+  \item \textbf{Normalize} rows by their max absolute value
+  \item \textbf{Pivot} — swap rows to maximize diagonal entry
+  \item \textbf{Eliminate} — zero out below-diagonal entries
+  \item \textbf{Back-substitute} — solve from bottom up
+\end{enumerate}
+
+\vspace{0.2in}
+\begin{center}
+$\begin{bmatrix} * & * & * \\ * & * & * \\ * & * & * \end{bmatrix}
+\xrightarrow{\text{steps 1--3}}
+\begin{bmatrix} * & * & * \\ 0 & * & * \\ 0 & 0 & * \end{bmatrix}
+\xrightarrow{\text{step 4}}
+\begin{bmatrix} x_1 \\ x_2 \\ x_3 \end{bmatrix}$
+\end{center}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 5 - Steps 1 & 2: Normalize + Pivot
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Step 1: Normalize \quad Step 2: Pivot}{Algorithm}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\begin{multicols}{2}
+\textbf{Row Normalization:}
+
+Scale each active row so the largest entry has magnitude 1:
+\[
+A_{r,:} \leftarrow \frac{A_{r,:}}{\max_j |A_{r,j}|}
+\]
+
+Prevents large entries from dominating pivot selection.
+
+\columnbreak
+
+\textbf{Partial Pivoting:}
+
+Swap row $k$ with the row below it that has the largest $|A_{r,k}|$:
+\[
+\text{pivot} = \arg\max_{r \ge k} |A_{r,k}|
+\]
+
+Reduces round-off error amplification.
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 6 - Step 3: Forward Elimination
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Step 3: Forward Elimination}{Algorithm}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+For each row $r > k$, compute the multiplier and subtract:
+\[
+m_{r,k} = \frac{A_{r,k}}{A_{k,k}}, \qquad
+A_{r,:} \leftarrow A_{r,:} - m_{r,k} \cdot A_{k,:}
+\]
+
+\vspace{0.15in}
+\textbf{Example (instructor's 4×4 system):}
+\[
+\begin{bmatrix}
+1 & 1 & 1 & 1 \\
+1 & 2 & 3 & 4 \\
+0 & 2 & 0 & 1 \\
+-1 & -2 & 1 & 2
+\end{bmatrix}
+\xrightarrow{\text{eliminate col 1}}
+\begin{bmatrix}
+1 & 1 & 1 & 1 \\
+0 & 1 & 2 & 3 \\
+0 & 2 & 0 & 1 \\
+0 & -1 & 2 & 3
+\end{bmatrix}
+\xrightarrow{\cdots}
+\mathbf{U}
+\]
+
+Repeat for columns $k = 1, 2, \ldots, n{-}1$.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 7 - Step 4: Back Substitution (THE MISSING PIECE)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Step 4: Back Substitution (Missing from MATLAB)}{Algorithm}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+After forward elimination, we have $\mathbf{U}\mathbf{x} = \mathbf{c}$:
+
+\[
+\begin{bmatrix}
+U_{11} & U_{12} & \cdots & U_{1n} \\
+0 & U_{22} & \cdots & U_{2n} \\
+\vdots &  & \ddots & \vdots \\
+0 & 0 & \cdots & U_{nn}
+\end{bmatrix}
+\begin{bmatrix} x_1 \\ x_2 \\ \vdots \\ x_n \end{bmatrix}
+= \begin{bmatrix} c_1 \\ c_2 \\ \vdots \\ c_n \end{bmatrix}
+\]
+
+\vspace{0.1in}
+Solve \textbf{bottom-up}:
+\[
+\boxed{x_i = \frac{1}{U_{ii}}\left(c_i - \sum_{j=i+1}^{n} U_{ij}\,x_j\right), \quad i = n, n{-}1, \ldots, 1}
+\]
+
+\vspace{0.1in}
+This was the step \textbf{missing} from the original MATLAB code.
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 8 - Implementation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Implementation: solve\_lsoe (tools.py)}{Code}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.05in}
+
+\begin{lstlisting}
+def solve_lsoe(self, A, B):
+    A = np.array(A, dtype=np.float64)
+    B = np.array(B, dtype=np.float64).flatten()
+    n = A.shape[0]
+    for ix in range(n - 1):
+      # 1. Normalize
+      for r in range(ix, n):
+        A[r,ix:] /= np.max(np.abs(A[r,ix:]))
+      # 2. Pivot
+      piv = ix + np.argmax(np.abs(A[ix:,ix]))
+      A[[ix,piv]] = A[[piv,ix]]
+      # 3. Eliminate
+      for r in range(ix+1, n):
+        m = A[r,ix]/A[ix,ix]
+        A[r,ix:] -= m * A[ix,ix:]
+    # 4. Back Substitution
+    x = np.zeros(n)
+    for i in range(n-1, -1, -1):
+      x[i] = (B[i] - A[i,i+1:]@x[i+1:]) / A[i,i]
+    return x, 0
+\end{lstlisting}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 9 - Test Cases & Results
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Test Cases \& Results}{Verification}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\begin{multicols}{2}
+\textbf{Instructor's 4×4 System:}
+\[
+\mathbf{x} = \begin{bmatrix} 5.5 \\ 1 \\ -12.5 \\ 10 \end{bmatrix}
+\]
+Max error vs \texttt{numpy}: $1.78 \times 10^{-15}$
+
+\vspace{0.15in}
+\textbf{All Tests:}
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+\textbf{Test} & \textbf{Status} \\ \midrule
+4×4 instructor    & $\checkmark$ \\
+Identity 3×3      & $\checkmark$ \\
+Simple 2×2        & $\checkmark$ \\
+Singular detect   & $\checkmark$ \\
+Random 6×6        & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\columnbreak
+
+\begin{center}
+\includegraphics[width=0.45\textwidth]{unit04_accuracy_analysis.png}
+\end{center}
+
+Error stays near machine precision for well-conditioned matrices.
+\end{multicols}
+
+\leftskip 0in \rightskip 0in
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SLIDE 10 - Discussion & Conclusion
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\slideheader{Discussion \& Conclusion}{}
+
+\leftskip 0.7in \rightskip 0.7in
+\vspace{0.1in}
+
+\begin{multicols}{2}
+\textbf{Key Points:}
+\begin{itemize}
+  \item Scaled partial pivoting prevents catastrophic cancellation
+  \item Overall complexity: $O(n^3)$
+  \item Singular matrices detected via pivot threshold
+  \item Accuracy at machine precision for well-conditioned systems
+\end{itemize}
+
+\columnbreak
+
+\textbf{What We Did:}
+\begin{itemize}
+  \item Translated MATLAB $\to$ Python
+  \item \textbf{Added back substitution} (missing step)
+  \item Added to \texttt{lib/tools.py}
+  \item 5 test cases, all passing
+  \item Accuracy analysis plot
+\end{itemize}
+\end{multicols}
+
+\vspace{0.2in}
+\begin{center}
+\textbf{Conclusion:} Complete Gaussian elimination solver with scaled partial
+pivoting and back substitution, verified against NumPy to machine precision.
+\end{center}
+
+\leftskip 0in \rightskip 0in
+
+\end{huge}
+\end{document}

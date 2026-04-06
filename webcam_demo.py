@@ -5,10 +5,10 @@ import numpy as np
 tool = tools()
 
 
-scale = 0.05 # higher = finer tracking but slower (0.05 was too coarse for hands)
-sensitivity = 8000  # lower = less noise, higher = more responsive
+scale = 0.10 # higher = finer tracking but slower
+sensitivity = 5000  # lower = less noise, higher = more responsive
 frameOverlay = True # set to False for just the optical flow data
-interpolateFlow = False # smooth pixelated optical flow for cleaner overlay
+interpolateFlow = True # smooth pixelated optical flow for cleaner overlay
 
 
 def create_flow_legend(radius=80):
@@ -79,7 +79,7 @@ while True:
     magnitude, angle = cv2.cartToPolar(u.astype(np.float32), v.astype(np.float32))
 
     # Zero out tiny motions (auto-exposure / sensor noise)
-    mag_threshold = 1.0
+    mag_threshold = 3.0
     magnitude[magnitude < mag_threshold] = 0
 
     # ── Integrate flow to get trajectory using OUR trapezoidal rule ──
@@ -114,7 +114,13 @@ while True:
     if layered.shape[0] >= lh and layered.shape[1] >= lw:
         layered[-lh:, -lw:] = legend
 
-    if (frameOverlay):
+    # Show integrated trajectory displacement
+    cv2.putText(layered, f'Trajectory: dx={trajectory_x:.1f} dy={trajectory_y:.1f}',
+                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    cv2.putText(layered, f'Uses: differentiate() + integrate_trapezoidal()',
+                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+
+    if frameOverlay:
         cv2.imshow('Optical Flow Data (overlay)', layered)
     else:
         cv2.imshow('Optical Flow Data (raw)', upscaled)
