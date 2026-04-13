@@ -183,18 +183,98 @@ print(f"\n  Solution: x = {sol_vis}")
 print(f"  Verify:   A·x = {A_vis @ sol_vis}")
 print(f"  Expected:   B = {B_vis}")
 
+
+# ═══════════════════════════════════════════════════════════════════════
+# TEST 6: Cubic Spline — interpolate sin(x)
+# ═══════════════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  TEST 6: Cubic Spline Interpolation (sin function)")
+print("=" * 60)
+
+X_knots = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+Y_knots = np.sin(X_knots)
+
+coeffs, err_spline = tool.cubic_spline(X_knots, Y_knots)
+print(f"  Error code: {err_spline}")
+assert err_spline == 0, "Spline solve should succeed"
+
+y_at_knots = tool.eval_cubic_spline(X_knots, coeffs, X_knots)
+max_interp_err = np.max(np.abs(y_at_knots - Y_knots))
+print(f"  Max interpolation error at knots: {max_interp_err:.2e}")
+assert max_interp_err < 1e-8, "Spline must pass through data points!"
+print("  ✓ PASSED — spline passes through all knots\n")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# TEST 7: Cubic Spline — small 4-point system
+# ═══════════════════════════════════════════════════════════════════════
+print("=" * 60)
+print("  TEST 7: Cubic Spline (4-point system)")
+print("=" * 60)
+
+X7 = np.array([0, 1, 2, 3], dtype=float)
+Y7 = np.array([1, 2, 0, 3], dtype=float)
+
+coeffs7, err7 = tool.cubic_spline(X7, Y7)
+assert err7 == 0
+y7_check = tool.eval_cubic_spline(X7, coeffs7, X7)
+print(f"  Y at knots: {y7_check}")
+print(f"  Expected:   {Y7}")
+assert np.allclose(y7_check, Y7, atol=1e-8)
+print("  ✓ PASSED\n")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PLOT 3: Cubic Spline vs True Function
+# ═══════════════════════════════════════════════════════════════════════
+print("=" * 60)
+print("  Generating cubic spline plot...")
+print("=" * 60)
+
+x_fine = np.linspace(0, 5, 500)
+y_true = np.sin(x_fine)
+y_spline = tool.eval_cubic_spline(X_knots, coeffs, x_fine)
+
+fig2, axes2 = plt.subplots(1, 2, figsize=(14, 5))
+
+ax1 = axes2[0]
+ax1.plot(x_fine, y_true, 'k-', linewidth=2, label='True sin(x)')
+ax1.plot(x_fine, y_spline, 'b--', linewidth=2, label='Our cubic spline')
+ax1.scatter(X_knots, Y_knots, color='red', s=80, zorder=5, label='Knots')
+ax1.set_xlabel('x', fontsize=12)
+ax1.set_ylabel('y', fontsize=12)
+ax1.set_title('Cubic Spline Interpolation of sin(x)', fontsize=13)
+ax1.legend(fontsize=10)
+ax1.grid(True, ls='--', lw=0.6)
+
+ax2 = axes2[1]
+spline_error = np.abs(y_spline - y_true)
+ax2.semilogy(x_fine, spline_error, 'b-', linewidth=2, label='|spline − sin(x)|')
+ax2.set_xlabel('x', fontsize=12)
+ax2.set_ylabel('Absolute Error', fontsize=12)
+ax2.set_title('Cubic Spline Interpolation Error', fontsize=13)
+ax2.legend(fontsize=10)
+ax2.grid(True, ls='--', lw=0.6, which='both')
+
+plt.tight_layout()
+plt.savefig('unit04_cubic_spline.png', dpi=150)
+plt.show()
+
 # ═══════════════════════════════════════════════════════════════════════
 # Summary table
 # ═══════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 60)
 print("  Summary: All Tests")
 print("=" * 60)
-print(f"  {'Test':<40} {'Status':<10}")
+print(f"  {'Test':<45} {'Status':<10}")
 print("-" * 60)
-print(f"  {'1. Instructor 4×4 system':<40} {'✓ PASSED':<10}")
-print(f"  {'2. Identity matrix 3×3':<40} {'✓ PASSED':<10}")
-print(f"  {'3. Simple 2×2 system':<40} {'✓ PASSED':<10}")
-print(f"  {'4. Singular matrix detection':<40} {'✓ PASSED':<10}")
-print(f"  {'5. Random 6×6 well-conditioned':<40} {'✓ PASSED':<10}")
+print(f"  {'1. Instructor 4×4 system':<45} {'✓ PASSED':<10}")
+print(f"  {'2. Identity matrix 3×3':<45} {'✓ PASSED':<10}")
+print(f"  {'3. Simple 2×2 system':<45} {'✓ PASSED':<10}")
+print(f"  {'4. Singular matrix detection':<45} {'✓ PASSED':<10}")
+print(f"  {'5. Random 6×6 well-conditioned':<45} {'✓ PASSED':<10}")
+print(f"  {'6. Cubic spline (sin, 6 knots)':<45} {'✓ PASSED':<10}")
+print(f"  {'7. Cubic spline (4-point system)':<45} {'✓ PASSED':<10}")
 print("=" * 60)
 print("\nDONE!")
+

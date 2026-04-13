@@ -146,6 +146,129 @@ class tools:
 
         return x, 0
 
+    def cubic_spline(self, X, Y):
+        """Natural cubic spline interpolation using solve_lsoe.
+
+        Based on the MATLAB function_splines from ECE 5110.
+        Each spline segment i is: S_i(x) = a_i*x^3 + b_i*x^2 + c_i*x + d_i
+
+        Constraints (4*(n-1) equations for 4*(n-1) unknowns):
+            1. Each spline passes through its left endpoint   (n-1)
+            2. Each spline passes through its right endpoint   (n-1)
+            3. First derivative continuity at interior knots   (n-2)
+            4. Second derivative continuity at interior knots  (n-2)
+            5. Natural BCs: S''(x_0) = 0 and S''(x_{n-1}) = 0 (2)
+
+        Args:
+            X: array of n x-coordinates (knots), sorted.
+            Y: array of n y-values.
+
+        Returns:
+            (coeffs, error_code)
+            coeffs: array of length 4*(n-1), grouped as [a0,b0,c0,d0, a1,b1,c1,d1, ...]
+            error_code: 0 = success, -1 = error
+        """
+        import numpy as np
+
+        X = np.array(X, dtype=np.float64).flatten()
+        Y = np.array(Y, dtype=np.float64).flatten()
+        n = len(X)
+
+        if len(Y) != n:
+            return np.zeros(4 * (n - 1)), -1
+
+        num_unknowns = 4 * (n - 1)
+        A = np.zeros((num_unknowns, num_unknowns))
+        B = np.zeros(num_unknowns)
+
+        row = 0
+
+        # ── 1. Each spline touches its START point: S_i(x_i) = y_i ──
+        for i in range(n - 1):
+            col = 4 * i
+            xi = X[i]
+            A[row, col]     = xi**3
+            A[row, col + 1] = xi**2
+            A[row, col + 2] = xi
+            A[row, col + 3] = 1.0
+            B[row] = Y[i]
+            row += 1
+
+        # ── 2. Each spline touches its END point: S_i(x_{i+1}) = y_{i+1} ──
+        for i in range(n - 1):
+            col = 4 * i
+            xi1 = X[i + 1]
+            A[row, col]     = xi1**3
+            A[row, col + 1] = xi1**2
+            A[row, col + 2] = xi1
+            A[row, col + 3] = 1.0
+            B[row] = Y[i + 1]
+            row += 1
+
+        # ── 3. First derivative continuity: S_i'(x_{i+1}) = S_{i+1}'(x_{i+1}) ──
+        for i in range(n - 2):
+            col = 4 * i
+            xi1 = X[i + 1]
+            A[row, col]     = 3.0 * xi1**2
+            A[row, col + 1] = 2.0 * xi1
+            A[row, col + 2] = 1.0
+            A[row, col + 4] = -3.0 * xi1**2
+            A[row, col + 5] = -2.0 * xi1
+            A[row, col + 6] = -1.0
+            B[row] = 0.0
+            row += 1
+
+        # ── 4. Second derivative continuity: S_i''(x_{i+1}) = S_{i+1}''(x_{i+1}) ──
+        for i in range(n - 2):
+            col = 4 * i
+            xi1 = X[i + 1]
+            A[row, col]     = 6.0 * xi1
+            A[row, col + 1] = 2.0
+            A[row, col + 4] = -6.0 * xi1
+            A[row, col + 5] = -2.0
+            B[row] = 0.0
+            row += 1
+
+        # ── 5. Natural spline BCs: S''(x_0) = 0 and S''(x_{n-1}) = 0 ──
+        A[row, 0] = 6.0 * X[0]
+        A[row, 1] = 2.0
+        B[row] = 0.0
+        row += 1
+
+        col = 4 * (n - 2)
+        A[row, col]     = 6.0 * X[n - 1]
+        A[row, col + 1] = 2.0
+        B[row] = 0.0
+
+        coeffs, err = self.solve_lsoe(A, B)
+        return coeffs, err
+
+    def eval_cubic_spline(self, X, coeffs, x_eval):
+        """Evaluate a cubic spline at given x values.
+
+        Args:
+            X: original knot x-coordinates (n points).
+            coeffs: spline coefficients from cubic_spline() [4*(n-1)].
+            x_eval: points at which to evaluate the spline.
+
+        Returns:
+            y_eval: interpolated y values.
+        """
+        import numpy as np
+
+        X = np.array(X, dtype=np.float64).flatten()
+        x_eval = np.array(x_eval, dtype=np.float64).flatten()
+        n = len(X)
+        y_eval = np.zeros_like(x_eval)
+
+        for k, xv in enumerate(x_eval):
+            seg = min(max(np.searchsorted(X, xv) - 1, 0), n - 2)
+            col = 4 * seg
+            a, b, c, d = coeffs[col], coeffs[col+1], coeffs[col+2], coeffs[col+3]
+            y_eval[k] = a * xv**3 + b * xv**2 + c * xv + d
+
+        return y_eval
+
     def lagrange_interpolate(self, x, y):
         import numpy as np
         n = len(x)

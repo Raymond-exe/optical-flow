@@ -39,8 +39,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \title{Solving Linear Systems of Equations:\\
-  Gaussian Elimination with Scaled Partial Pivoting}
-\author{ Jared Acosta, Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, Richie Wong\\ Cal Poly Pomona; Pomona, California \\ April 6, 2026}
+  Gaussian Elimination, Back Substitution, \& Cubic Splines}
+\author{ Jared Acosta, Josiah Wiggins, Jake Davila, Jack Gaon, Jacky Li, Virgil Nhieu, Elijah Perez, Richie Wong\\ Cal Poly Pomona; Pomona, California \\ April 13, 2026}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Begin document
@@ -56,13 +56,13 @@ is one of the most fundamental tasks in numerical computing.  Applications
 range from circuit analysis and structural engineering to machine learning
 and computer graphics.
 
-This report presents a Python implementation of \textbf{Gaussian
-elimination with scaled partial pivoting}, translated from the MATLAB
-\texttt{function\_solve\_lsoe} provided in ECE~5110.  The original MATLAB
-code performed row normalization, partial pivoting, and forward
-elimination but was \emph{missing the back-substitution step}.  We
-complete the algorithm, verify it against NumPy's built-in solver, and
-analyze its accuracy as a function of matrix size.
+This report presents Python implementations of \textbf{Gaussian
+elimination with scaled partial pivoting} and \textbf{natural cubic
+spline interpolation}, both translated from MATLAB code provided in
+ECE~5110.  The original MATLAB \texttt{function\_solve\_lsoe} was
+missing the back-substitution step; the \texttt{function\_splines} code
+builds a constraint matrix and solves it via \texttt{solve\_lsoe}.  We
+complete both algorithms in Python, verify them, and analyze accuracy.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Theory}
@@ -113,6 +113,21 @@ x_i = \frac{1}{U_{i,i}}\!\left(c_i - \sum_{j=i+1}^{n} U_{i,j}\,x_j\right),
 \quad i = n, n{-}1, \ldots, 1
 \]
 This is the step that was \textbf{missing} from the original MATLAB code.
+
+\subsection{Natural Cubic Splines}
+Given $n$ data points $(x_0, y_0), \ldots, (x_{n-1}, y_{n-1})$,
+we fit $n-1$ cubic polynomials
+$S_i(x) = a_i x^3 + b_i x^2 + c_i x + d_i$
+with \textbf{five types of constraints}:
+\begin{enumerate}
+  \item Each $S_i$ passes through its left knot: $S_i(x_i) = y_i$
+  \item Each $S_i$ passes through its right knot: $S_i(x_{i+1}) = y_{i+1}$
+  \item First-derivative continuity: $S_i'(x_{i+1}) = S_{i+1}'(x_{i+1})$
+  \item Second-derivative continuity: $S_i''(x_{i+1}) = S_{i+1}''(x_{i+1})$
+  \item Natural BCs: $S_0''(x_0) = 0$, $S_{n-2}''(x_{n-1}) = 0$
+\end{enumerate}
+This yields $4(n-1)$ equations for $4(n-1)$ unknowns, which we solve
+using \texttt{solve\_lsoe}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Implementation}
@@ -181,9 +196,11 @@ matching \texttt{numpy.linalg.solve} to within $1.78 \times 10^{-15}$.
 \textbf{Test} & \textbf{Size} & \textbf{Result} \\
 \midrule
 Identity matrix        & $3 \times 3$ & $\checkmark$ \\
-Simple 2×2             & $2 \times 2$ & $\checkmark$ \\
+Simple 2$\times$2      & $2 \times 2$ & $\checkmark$ \\
 Singular matrix        & $3 \times 3$ & detected \\
 Random well-conditioned & $6 \times 6$ & $\checkmark$ \\
+Cubic spline (sin, 6 knots) & $20 \times 20$ & $\checkmark$ \\
+Cubic spline (4-point)   & $12 \times 12$ & $\checkmark$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -208,6 +225,17 @@ The error remains near machine precision ($\sim 10^{-13}$) for
 well-conditioned systems, confirming that our implementation is
 numerically stable for diagonally dominant matrices.
 
+Figure~\ref{fig:spline} shows the cubic spline interpolation of
+$\sin(x)$ with 6 knots.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{unit04_cubic_spline.png}
+\caption{Left: cubic spline fit of $\sin(x)$ using 6 knots.
+Right: absolute interpolation error.}
+\label{fig:spline}
+\end{figure}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Discussion}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -227,11 +255,11 @@ numerically stable for diagonally dominant matrices.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusion}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-We translated the MATLAB \texttt{function\_solve\_lsoe} to Python,
-\textbf{added the missing back-substitution step}, and verified the
-complete Gaussian elimination solver against NumPy's built-in
-\texttt{linalg.solve}.  All five test cases pass with errors at
-machine-precision level.  The method lives in \texttt{lib/tools.py}
-alongside the other numerical methods from previous units.
+We translated two MATLAB functions to Python: \texttt{solve\_lsoe}
+(with the missing back substitution added) and \texttt{function\_splines}
+(natural cubic spline interpolation).  The spline method builds a
+$4(n{-}1) \times 4(n{-}1)$ constraint system and solves it directly
+via our Gaussian elimination solver.  All seven test cases pass
+with errors at machine-precision level.
 
 \end{document}
